@@ -4,7 +4,8 @@ Este repositorio contiene todo el código que he desarrollado durante mi estanci
 
 Todo el código que genera resultados está escrito en notebooks de jupyter para poder visualizar también los resultados sin necesidad de ejecutarse.
 
-He organizado todos los archivos por quincenas para así ayudarme a la hora de redactar los informes quincenales, así como la memoria final.
+He organizado todos los archivos por quincenas para facilitar la redacción de los informes quincenales y la memoria final.
+
 
 ## Primera quincena
 
@@ -13,6 +14,7 @@ He organizado todos los archivos por quincenas para así ayudarme a la hora de r
 - `shuffle-iterativo/`. Directorio que contiene un análisis de como afecta a los datos el shuffle iterativo de *Blosc*.
 
 - `orden-permutaciones/`. Directorio que contiene un análisis del orden del shuffle iterativo, pues se puede considerar como una permutación de datos.
+
 
 ## Segunda quincena
 
