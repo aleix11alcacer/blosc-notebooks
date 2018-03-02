@@ -20,4 +20,6 @@ He organizado todos los archivos por quincenas para facilitar la redacción de l
 
 - `analisis-imagenes/`. Directorio que contiene un análisis de los resultados de la compresión de imágenes, cuando se aplica una transformación previa a la imagen.
 
+- `analisis-datos-reales/`. Directorio que contiene un análisis de los resultados de la compresión de datos reales, cuando se aplica una transformación previa al conjunto de datos.
+
 - `eliminar-bucles/`. Directorio que contiene un algoritmo que realiza transformaciones a conjuntos de datos en *n* dimensiones sin usar bucles anidados.
