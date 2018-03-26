@@ -15,7 +15,7 @@ ffibuilder.set_source("tdg",
 #include <stdio.h>
 #include <string.h>
 
-void transform_data_general(void* src, void* dest, size_t typesize, size_t sub_shape[], size_t shape[], size_t dimension, size_t inverse) {
+void transform_data(void* src, void* dest, size_t typesize, size_t sub_shape[], size_t shape[], size_t dimension, size_t inverse) {
 
     size_t MAX_DIM = 8;
     size_t DIM = dimension;
@@ -161,7 +161,7 @@ ffibuilder.cdef(
 // declarations that are shared between Python and C
 
 
-void transform_data_general(char* src, char* dest, size_t typesize, size_t sub_shape[], size_t shape[], size_t dimension, size_t inverse);
+void transform_data(char* src, char* dest, size_t typesize, size_t sub_shape[], size_t shape[], size_t dimension, size_t inverse);
 """)
 
 if __name__ == "__main__":

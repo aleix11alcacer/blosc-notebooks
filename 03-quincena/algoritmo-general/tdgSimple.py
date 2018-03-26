@@ -7,10 +7,13 @@
 from cffi import FFI
 ffibuilder = FFI()
 
-ffibuilder.set_source("transform_data",
+ffibuilder.set_source("tdgSimple",
 """
 // passed to the real C compiler,
 // contains implementation of things declared in cdef()
+
+#include <stdio.h>
+#include <string.h>
 
 void transform_data(char* src, char* dest, size_t typesize, size_t sub_shape[], size_t shape[], size_t dimension, size_t inverse) {
 
