@@ -1,17 +1,3 @@
-# file "example_build.py"
-
-# Note: we instantiate the same 'cffi.FFI' class as in the previous
-# example, but call the result 'ffibuilder' now instead of 'ffi';
-# this is to avoid confusion with the other 'ffi' object you get below
-
-from cffi import FFI
-ffibuilder = FFI()
-
-ffibuilder.set_source("tdg",
-"""
-// passed to the real C compiler,
-// contains implementation of things declared in cdef()
-
 #include <stdio.h>
 #include <string.h>
 
@@ -80,7 +66,7 @@ void transform_data_general(void* src, void* dest, size_t typesize, size_t sub_s
                     +
                     dim[6]*(K/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5])%sub[6]*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5] + K/(shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*sub[6]*sub[7])%(shp[6]/sub[6])*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*sub[6])
                     +
-                    dim[7]*(K/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6])%sub[7]*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6] + K/(shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*sub[7])%(shp[7]/sub[7])*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*sub[7]);
+                    dim[7]*(K/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6])%sub[7]*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6] + K/(shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*sub[7])%(shp[7]/sub[7])*shp[0]*shp[1]*shp[2]*shp[3]*shp[5]*shp[6]*sub[7]);
 
 
                 inc = J/shp[0] * (sho[0]%sub[0])
@@ -133,7 +119,7 @@ void transform_data_general(void* src, void* dest, size_t typesize, size_t sub_s
                     +
                     dim[6]*(K/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5])%sub[6]*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5] + K/(shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*sub[6]*sub[7])%(shp[6]/sub[6])*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*sub[6])
                     +
-                    dim[7]*(K/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6])%sub[7]*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6] + K/(shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*sub[7])%(shp[7]/sub[7])*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*sub[7]);
+                    dim[7]*(K/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6])%sub[7]*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6] + K/(shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*sub[7])%(shp[7]/sub[7])*shp[0]*shp[1]*shp[2]*shp[3]*shp[5]*shp[6]*sub[7]);
 
                 inc = J/shp[0] * (sho[0]%sub[0])
                       + J/(shp[1] * shp[0]) * (sho[1]%sub[1])*sho[0]
@@ -154,15 +140,59 @@ void transform_data_general(void* src, void* dest, size_t typesize, size_t sub_s
     }
 }
 
-""", libraries=[])
+int main(int argc, char const *argv[]) {
 
-ffibuilder.cdef(
-"""
-// declarations that are shared between Python and C
+    size_t TAM = 280;
+
+    int src[TAM], dest[TAM], src2[TAM];
+
+    size_t typesize, sub_shape[8], shape[8], dimension, inverse;
 
 
-void transform_data_general(char* src, char* dest, size_t typesize, size_t sub_shape[], size_t shape[], size_t dimension, size_t inverse);
-""")
+    for (size_t i = 0; i < TAM; i++) {
+        src[i] = i;
+    }
 
-if __name__ == "__main__":
-    ffibuilder.compile(verbose=True)
+    typesize = 4;
+
+    sub_shape[0] = 2;
+    sub_shape[1] = 3;
+    sub_shape[2] = 2;
+    sub_shape[3] = 1;
+    sub_shape[4] = 1;
+    sub_shape[5] = 1;
+    sub_shape[6] = 1;
+    sub_shape[7] = 1;
+
+
+    shape[0] = 5;
+    shape[1] = 7;
+    shape[2] = 8;
+    shape[3] = 1;
+    shape[4] = 1;
+    shape[5] = 1;
+    shape[6] = 1;
+    shape[7] = 1;
+
+
+    dimension = 4;
+
+    inverse = 0;
+
+    transform_data_general(src, dest, typesize, sub_shape, shape, dimension, inverse);
+
+    inverse = 1;
+
+    transform_data_general(dest, src2, typesize, sub_shape, shape, dimension, inverse);
+
+
+    for (size_t i = 0; i < TAM; i++) {
+        printf("%d\n", dest[i]);
+        if (src[i] != src2[i]) {
+            printf("Error en el funcionamiento del algoritmo.\n");
+            return 0;
+        };
+    }
+    printf("El algoritmo funciona correctamente.\n");
+    return 0;
+}
