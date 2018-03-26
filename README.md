@@ -23,3 +23,11 @@ He organizado todos los archivos por quincenas para facilitar la redacción de l
 - `analisis-datos-reales/`. Directorio que contiene un análisis de los resultados de la compresión de datos reales, cuando se aplica una transformación previa al conjunto de datos.
 
 - `eliminar-bucles/`. Directorio que contiene un algoritmo que realiza transformaciones a conjuntos de datos en *n* dimensiones sin usar bucles anidados.
+
+## Tercera quincena
+
+- `eliminar-bucles_C/`. Directorio que contiene un algoritmo que realiza transformaciones a conjuntos de datos en *n* dimensiones sin usar bucles anidados y escrito en el lenguaje de programación *C*.
+
+- `arreglar-algoritmo/`. Directorio que contiene los resultados finales, junto con unos tests, del algoritmo creado. Se ha creado para detectar y corregir los posibles fallos del algoritmo.
+
+- `algortimo-general/`. Directorio que contiene el resultado final del algoritmo. Contiene el algoritmo implementado en *numpy*, el algortimo implementado en *Python* y el algortimo implementado en *C*.
