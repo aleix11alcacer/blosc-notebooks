@@ -31,3 +31,9 @@ He organizado todos los archivos por quincenas para facilitar la redacción de l
 - `arreglar-algoritmo/`. Directorio que contiene los resultados finales, junto con unos tests, del algoritmo creado. Se ha creado para detectar y corregir los posibles fallos del algoritmo.
 
 - `algortimo-general/`. Directorio que contiene el resultado final del algoritmo. Contiene el algoritmo implementado en *numpy*, el algortimo implementado en *Python* y el algortimo implementado en *C*.
+
+## Cuarta quincena
+
+-`algoritmo-bucles-for/`. Directorio que contiene el algoritmo implementado, tanto la versión simple como la general, con bucles *for* para ver si la implementación resulta más sencilla o no. NO SE VA A REALIZAR.
+
+-`resultados/`. Directorio que contiene un notebook que utiliza todo lo que se ha desarrollado hasta la fecha.
