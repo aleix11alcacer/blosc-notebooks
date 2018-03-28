@@ -5,7 +5,7 @@ Crea una libreria que ciene en una función los dos algoritmos juntos: el simple
 from cffi import FFI
 ffibuilder = FFI()
 
-ffibuilder.set_source("tData0",
+ffibuilder.set_source("tData",
 '''
 #include <stdio.h>
 #include <string.h>
