@@ -1,6 +1,27 @@
 '''
-Crea una libreria que ciene en una función los dos algoritmos juntos: el simple y el general.
+Creates CFFI library to implement a data transformation algorithm.
+
+Functions
+----------
+calculate_j:  int
+    Calculate the value of j and returns it
+
+calculate_i: int
+    Calculate the value of the increment and returns it
+
+calculate_cond: int
+    Calculate the condition and returns it
+
+tData: void
+    Choose if the algorithm needed is general or simple.
+
+tData_general: void
+    Calculate the data transformation in case that the algorithm needed is general.
+
+tData_simple: void
+    Calculate the data transformation in case that the algorithm needed is simple.
 '''
+
 
 from cffi import FFI
 ffibuilder = FFI()
