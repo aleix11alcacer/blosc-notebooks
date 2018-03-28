@@ -37,3 +37,5 @@ He organizado todos los archivos por quincenas para facilitar la redacción de l
 -`algoritmo-bucles-for/`. Directorio que contiene el algoritmo implementado, tanto la versión simple como la general, con bucles *for* para ver si la implementación resulta más sencilla o no. NO SE VA A REALIZAR.
 
 -`resultados/`. Directorio que contiene un notebook que utiliza todo lo que se ha desarrollado hasta la fecha.
+
+-`version-completa/`. Directorio que contiene la libreria que junta el algoritmo simple y el general en una sola función.
