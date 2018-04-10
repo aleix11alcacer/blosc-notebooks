@@ -16,6 +16,7 @@ def tData(src, sub_shp, inverse=False):
         Data to transform.
     sub_shp: int[] or tuple
         Data partition shape.
+    inverse: bool, optional
 
     Returns
     -------

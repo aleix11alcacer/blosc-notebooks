@@ -1,25 +1,111 @@
 '''
 Creates CFFI library to implement a data transformation algorithm.
 
-Functions
-----------
-calculate_j:  int
-    Calculate the value of j and returns it
 
-calculate_i: int
-    Calculate the value of the increment and returns it
+calculate_j(k, dim, shp, sub)
 
-calculate_cond: int
-    Calculate the condition and returns it
+    Calculate the value of j and returns it.
 
-tData: void
+    Parameters
+    ----------
+        k: size_t
+        dim: size_t[]
+        shp: size_t[]
+        sub: size_t[]
+
+    Returns
+    -------
+        j: size_t
+
+
+calculate_i(j, shp, sho, sub)
+
+    Calculate the value to increment and returns it.
+
+    Parameters
+    ----------
+        k: size_t
+        shp: size_t[]
+        sho: size_t[]
+        sub: size_t[]
+
+    Returns
+    -------
+        i: size_t
+
+
+calculate_cond(k, c, sho, sub)
+    Calculate the condition and returns it.
+
+    Parameters
+    ----------
+        k: size_t
+        c: size_t
+        sho: size_t[]
+        sub: size_t[]
+
+    Returns
+    -------
+        cond: int
+
+tData(src, dest, typesize, sub_shape, shape, dimension, inverse)
     Choose if the algorithm needed is general or simple.
 
-tData_general: void
+    Parameters
+    ----------
+        src: char*
+            Location of data to transform pointer.
+        dest: char*
+            Location of data transformed pointer.
+        typesize: size_t
+            Data element size.
+        sub_shape: size_t[]
+            Data partition shape.
+        shape: size_t[]
+            Data shape.
+        dimension: size_t
+            Data dimension.
+        inverse: size_t
+
+
+tData_general(src, dest, typesize, sub_shape, shape, dimension, inverse)
     Calculate the data transformation in case that the algorithm needed is general.
 
-tData_simple: void
+    Parameters
+    ----------
+        src: char*
+            Location of data to transform pointer.
+        dest: char*
+            Location of data transformed pointer.
+        typesize: size_t
+            Data element size.
+        sub_shape: size_t[]
+            Data partition shape.
+        shape: size_t[]
+            Data shape.
+        dimension: size_t
+            Data dimension.
+        inverse: size_t
+
+
+tData_general(src, dest, typesize, sub_shape, shape, dimension, inverse)
     Calculate the data transformation in case that the algorithm needed is simple.
+
+    Parameters
+    ----------
+        src: char*
+            Location of data to transform pointer.
+        dest: char*
+            Location of data transformed pointer.
+        typesize: size_t
+            Data element size.
+        sub_shape: size_t[]
+            Data partition shape.
+        shape: size_t[]
+            Data shape.
+        dimension: size_t
+            Data dimension.
+        inverse: size_t
 '''
 
 
@@ -31,7 +117,7 @@ ffibuilder.set_source("tData",
 #include <stdio.h>
 #include <string.h>
 
-int calculate_j(size_t k, size_t dim[], size_t shp[], size_t sub[]) {
+size_t calculate_j(size_t k, size_t dim[], size_t shp[], size_t sub[]) {
 
     size_t j = dim[0]*((k)%sub[0] + k/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6]*sub[7])%(shp[0]/sub[0])*sub[0])
         +
@@ -52,7 +138,7 @@ int calculate_j(size_t k, size_t dim[], size_t shp[], size_t sub[]) {
         return j;
 }
 
-int calculate_i(size_t j, size_t shp[], size_t sho[], size_t sub[]) {
+size_t calculate_i(size_t j, size_t shp[], size_t sho[], size_t sub[]) {
     size_t i = j/shp[0] * (sho[0]%sub[0])
                  + j/(shp[1] * shp[0]) * (sho[1]%sub[1])*sho[0]
                  + j/(shp[2] * shp[1] * shp[0]) * (sho[2]%sub[2]) * sho[0] * sho[1]
