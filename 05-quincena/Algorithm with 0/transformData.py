@@ -4,6 +4,7 @@ Implements functions to use tData library.
 
 import numpy as np
 from tData import ffi, lib
+import pycblosc2 as cb2
 
 
 def tData(src, sub_shp, inverse=False):
@@ -47,7 +48,7 @@ def tData(src, sub_shp, inverse=False):
 
     lib.tData(src2, dest2, typesize, sub_shp, shape, dimension, inverse)
 
-    return dest.reshape(shape)
+    return dest, shape
 
 
 def createIndexation(s, sb):
@@ -75,3 +76,83 @@ def obtainIndex(x, y, z, dic, s, sb):
 
                 ind.append(((i, j, k), dic[K]))
     return ind
+
+
+# Compression/decompression functions
+
+def compress(cparams, dparams, src):
+
+    bsize = src.size * src.dtype.itemsize
+
+    schunk = cb2.blosc2_new_schunk(cparams, dparams)
+
+    nchunks = cb2.blosc2_append_buffer(schunk, bsize, src)
+
+    return schunk
+
+
+def decompress(schunk, item_size, s, x=slice(0, None), y=slice(0, None), z=slice(0, None)):
+
+    size = np.prod(s)
+    bsize = size * item_size
+
+    dest = np.zeros(size, dtype=np.int32).reshape(s)
+
+    cb2.blosc2_decompress_chunk(schunk, 0, dest, bsize)
+    cb2.blosc2_free_schunk(schunk)
+
+    return dest[x, y, z]
+
+
+def compress_trans(cparams, dparams, srct, ts, sb):
+
+    a_size = np.prod(sb)
+    a_bsize = a_size * srct.dtype.itemsize
+
+    schunk = cb2.blosc2_new_schunk(cparams, dparams)
+
+    for i in range(ts[0]//sb[0] * ts[1]//sb[1] * ts[2]//sb[2]):
+        aux = srct[i * a_size:(i+1) * a_size]
+        nchunks = cb2.blosc2_append_buffer(schunk, a_bsize, aux)
+
+    return schunk
+
+
+def decompress_trans(schunk, indexation, item_size, s, ts, sb, x=slice(0, None), y=slice(0, None),
+                     z=slice(0, None)):
+    index_aux = [1, 1, 1]
+    xl, yl, zl = ts
+    xi, yi, zi = (0, ts[0]), (0, ts[1]), (0, ts[2])
+
+    if x != slice(0, None):
+        xl = sb[0]
+        xi = (x, x+1)
+        index_aux[0] = 0
+        x = x % xl
+    if y != slice(0, None):
+        yl = sb[1]
+        yi = (y, y+1)
+        index_aux[1] = 0
+        y = y % yl
+    if z != slice(0, None):
+        zl = sb[2]
+        zi = (z, z+1)
+        index_aux[2] = 0
+        z = z % zl
+    SUBPL = [xl, yl, zl]
+
+    ind = obtainIndex(xi, yi, zi, indexation, ts, sb)
+
+    dest = np.zeros(np.prod(SUBPL), dtype=np.int32).reshape(SUBPL)
+
+    AUX_SIZE = np.prod(sb)
+    AUX_bsize = AUX_SIZE * item_size
+
+    aux = np.zeros(AUX_SIZE, dtype=np.int32).reshape(sb)
+
+    for index, n in ind:
+        i, j, k = [index[q]*index_aux[q] for q in range(3)]
+        cb2.blosc2_decompress_chunk(schunk, n, aux, AUX_bsize)
+        dest[i:i+sb[0], j:j+sb[1], k:k+sb[2]] = aux
+
+    return dest[x, y, z]
