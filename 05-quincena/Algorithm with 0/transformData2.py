@@ -207,8 +207,10 @@ def decompress_trans(schunk, indexation, item_size, s, ts, sb, a=None, b=None, c
     aux = np.zeros(aux_size, dtype=np.int32).reshape(sb)
 
     for index, n in ind:
+
         index = [index[q]*index_aux[q] for q in range(len(dim))]
         cb2.blosc2_decompress_chunk(schunk, n, aux, AUX_bsize)
+
         dest[index[0]:index[0]+sb[0],
              index[1]:index[1]+sb[1],
              index[2]:index[2]+sb[2],
