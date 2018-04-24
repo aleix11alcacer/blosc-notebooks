@@ -138,31 +138,6 @@ size_t calculate_j(size_t k, size_t dim[], size_t shp[], size_t sub[]) {
         return j;
 }
 
-size_t calculate_i(size_t j, size_t shp[], size_t sho[], size_t sub[]) {
-    size_t i = j/shp[0] * (sho[0]%sub[0])
-                 + j/(shp[1] * shp[0]) * (sho[1]%sub[1])*sho[0]
-                 + j/(shp[2] * shp[1] * shp[0]) * (sho[2]%sub[2]) * sho[0] * sho[1]
-                 + j/(shp[3] * shp[2]*shp[1]*shp[0]) * (sho[3]%sub[3]) * sho[0]*sho[1]*sho[2]
-                 + j/(shp[4] * shp[3]*shp[2]*shp[1]*shp[0]) * (sho[4]%sub[4]) * sho[0]*sho[1]*sho[2]*sho[3]
-                 + j/(shp[5] * shp[4]*shp[3]*shp[2]*shp[1]*shp[0]) * (sho[5]%sub[5]) * sho[0]*sho[1]*sho[2]*sho[3]*sho[4]
-                 + j/(shp[6] * shp[5]*shp[4]*shp[3]*shp[2]*shp[1]*shp[0]) * (sho[6]%sub[6]) * sho[0]*sho[1]*sho[2]*sho[3]*sho[4]*sho[5]
-                 + j/(shp[7] * shp[6]*shp[5]*shp[4]*shp[3]*shp[2]*shp[1]*shp[0]) * (sho[7]%sub[7]) * sho[0]*sho[1]*sho[2]*sho[3]*sho[4]*sho[5]*sho[6];
-     return i;
-
-}
-
-int calculate_cond(size_t k, size_t c, size_t sho[], size_t sub[]) {
-    int cond = (((k + c)%sho[0] >= sho[0] - sho[0]%sub[0])
-            || ((k + c)%(sho[0]*sho[1])/(sho[0]) >= sho[1] - sho[1]%sub[1])
-            || ((k + c)%(sho[0]*sho[1]*sho[2])/(sho[0]*sho[1]) >= sho[2] - sho[2]%sub[2])
-            || ((k + c)%(sho[0]*sho[1]*sho[2]*sho[3])/(sho[0]*sho[1]*sho[2]) >= sho[3] - sho[3]%sub[3])
-            || ((k + c)%(sho[0]*sho[1]*sho[2]*sho[3]*sho[4])/(sho[0]*sho[1]*sho[2]*sho[3]) >= sho[4] - sho[4]%sub[4])
-            || ((k + c)%(sho[0]*sho[1]*sho[2]*sho[3]*sho[4]*sho[5])/(sho[0]*sho[1]*sho[2]*sho[3]*sho[4]) >= sho[5] - sho[5]%sub[5])
-            || ((k + c)%(sho[0]*sho[1]*sho[2]*sho[3]*sho[4]*sho[5]*sho[6])/(sho[0]*sho[1]*sho[2]*sho[3]*sho[4]*sho[5]) >= sho[6] - sho[6]%sub[6])
-            || ((k + c)%(sho[0]*sho[1]*sho[2]*sho[3]*sho[4]*sho[5]*sho[6]*sho[7])/(sho[0]*sho[1]*sho[2]*sho[3]*sho[4]*sho[5]*sho[6]) >= sho[7] - sho[7]%sub[7]));
-    return cond;
-}
-
 void tData_simple(char* src, char* dest, size_t typesize, size_t sub_shape[], size_t shape[], size_t dimension, size_t inverse) {
 
     size_t MAX_DIM = 8;
@@ -208,6 +183,58 @@ int tData(char* src, char* dest, size_t typesize, size_t sub_shape[], size_t sha
     return 1;
 }
 
+int k, k2;
+void padData(char* src, char* dest, int typesize, int shape[], int pad_shape[], int dimension) {
+
+    int MAX_DIM = 8;
+    int DIM = dimension;
+
+    int s[MAX_DIM], ps[MAX_DIM];
+
+    for (int i = 0; i < MAX_DIM; i++) {
+        if (i < DIM) {
+            s[MAX_DIM + i - DIM] = shape[i];
+            ps[MAX_DIM + i - DIM] = pad_shape[i];
+        } else {
+            s[MAX_DIM - i - 1] = 1;
+            ps[MAX_DIM - i - 1] = 1;
+        }
+    }
+
+
+    for (int a = 0; a < s[0]; a++) {
+        for (int b = 0; b < s[1]; b++) {
+            for (int c = 0; c < s[2]; c++) {
+                for (int d = 0; d < s[3]; d++) {
+                    for (int e = 0; e < s[4]; e++) {
+                        for (int f = 0; f < s[5]; f++) {
+                            for (int g = 0; g < s[6]; g++) {
+
+                                k =  g*s[7]
+                                     + f*s[7]*s[6]
+                                     + e*s[7]*s[6]*s[5]
+                                     + d*s[7]*s[6]*s[5]*s[4]
+                                     + c*s[7]*s[6]*s[5]*s[4]*s[3]
+                                     + b*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]
+                                     + a*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]*s[1];
+
+                                k2 = g*ps[7]
+                                     + f*ps[7]*ps[6]
+                                     + e*ps[7]*ps[6]*ps[5]
+                                     + d*ps[7]*ps[6]*ps[5]*ps[4]
+                                     + c*ps[7]*ps[6]*ps[5]*ps[4]*ps[3]
+                                     + b*ps[7]*ps[6]*ps[5]*ps[4]*ps[3]*ps[2]
+                                     + a*ps[7]*ps[6]*ps[5]*ps[4]*ps[3]*ps[2]*ps[1];
+
+                                memcpy(&dest[k2 * typesize], &src[k *  typesize], s[7] * typesize);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 ''',
 libraries=[])
 
@@ -218,6 +245,11 @@ ffibuilder.cdef(
 
                 void tData_simple(char* src, char* dest, size_t typesize, size_t sub_shape[],
                                   size_t shape[], size_t dimension, size_t inverse);
+
+                size_t calculate_j(size_t k, size_t dim[], size_t shp[], size_t sub[]);
+
+                void padData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
+                             int dimension);
 
                 '''
                 )
