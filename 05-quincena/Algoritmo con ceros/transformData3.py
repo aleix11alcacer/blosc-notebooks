@@ -9,7 +9,7 @@ import pycblosc2 as cb2
 
 def tData(src, sub_shp, inverse=False):
     """
-    Execute tData function of tData library.
+    Apply a data transformation based in reorganize data partitions.
 
     Parameters
     ----------
@@ -25,60 +25,40 @@ def tData(src, sub_shp, inverse=False):
         Data transformed.
     """
 
+    # Obtain src parameters
+
     typesize = src.dtype.itemsize
     shape = src.shape
     dimension = len(shape)
 
-    src = padData(src, sub_shp)
+    # Calculate the extended dataset parameters
 
-    dest = np.zeros(src.size, dtype=src.dtype)
-
-    src2 = ffi.from_buffer(src)
-    dest2 = ffi.from_buffer(dest)
-
-    shape = src.shape
-
-    lib.tData(src2, dest2, typesize, sub_shp, shape, dimension, inverse)
-
-    return dest, shape
-
-
-def padData(src, sub_shp):
-    """
-    Pad matrix with 0. Similar to numpy.pad()
-
-    Parameters
-    ----------
-    src : np.array
-        Data to transform.
-    sub_shp: int[] or tuple
-        Data partition shape.
-
-    Returns
-    -------
-    dest: np.array
-        Data transformed.
-    """
-    typesize = src.dtype.itemsize
-    shape = src.shape
-    dimension = len(shape)
-
-    padShape = []
+    pad_shp = []
 
     for i in range(len(shape)):
         d = shape[i]
         if shape[i] % sub_shp[i] != 0:
             d = shape[i] + sub_shp[i] - shape[i] % sub_shp[i]
-        padShape.append(d)
+        pad_shp.append(d)
 
-    dest = np.zeros(np.prod(padShape), dtype=src.dtype).reshape(padShape)
+    size = np.prod(pad_shp)
+
+    # Create destination dataset
+
+    dest = np.zeros(size, dtype=src.dtype).reshape(pad_shp)
+
+    # Transform datasets to buffers (for use in cffi)
 
     src2 = ffi.from_buffer(src)
     dest2 = ffi.from_buffer(dest)
 
-    lib.padData(src2, dest2, typesize, shape, padShape, dimension)
+    # Execute the transformation
 
-    return dest
+    lib.tData(src2, dest2, typesize, shape, pad_shp, sub_shp, size, dimension, inverse)
+
+    d = createIndexation(pad_shp, sub_shp)
+
+    return dest, d
 
 
 def reorder_dim(dim, l):
@@ -97,34 +77,37 @@ def create_shape(s):
 
 
 def createIndexation(s, sb):
+    """
+    Create an indexation of the data partitions of a dataset transformed.
 
-    s = create_shape(s)
-    sb = create_shape(sb)
+    Parameters
+    ----------
+    s : int[] or tuple
+        Data shape.
+    sb: int[] or tuple
+        Data partition shape.
 
-    dic = {}
-    cont = 0
+    Returns
+    -------
+    indexation: dict
+        Dictianary containing the indexation.
+        key: partition number
+        value: schunk number to decompress
+    """
 
-    for a in range(0, s[0], sb[0]):
-        for b in range(0, s[1], sb[1]):
-            for c in range(0, s[2], sb[2]):
-                for d in range(0, s[3], sb[3]):
-                    for e in range(0, s[4], sb[4]):
-                        for f in range(0, s[5], sb[5]):
-                            for g in range(0, s[6], sb[6]):
-                                for h in range(0, s[7], sb[7]):
+    dimension = len(s)
 
-                                    K = (h
-                                         + g*s[7]
-                                         + f*s[7]*s[6]
-                                         + e*s[7]*s[6]*s[5]
-                                         + d*s[7]*s[6]*s[5]*s[4]
-                                         + c*s[7]*s[6]*s[5]*s[4]*s[3]
-                                         + b*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]
-                                         + a*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]*s[1])
+    size = int(np.prod(s)/np.prod(sb))
 
-                                    dic[K] = cont
-                                    cont += 1
-    return dic
+    keys = np.zeros(size, dtype=np.int64)
+
+    k = ffi.from_buffer(keys)
+
+    lib.createIndexation(k, s, sb, dimension)
+
+    d = dict([(k, v) for v, k in enumerate(keys)])
+
+    return d
 
 
 def obtainIndex(dim, dic, s, sb):
@@ -154,6 +137,8 @@ def obtainIndex(dim, dic, s, sb):
 
                                     ind.append(((a, b, c, d, e, f, g, h), dic[K]))
     return ind
+
+
 
 
 # Compression/decompression functions

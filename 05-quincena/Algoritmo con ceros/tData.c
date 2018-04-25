@@ -492,10 +492,11 @@ static void (*_cffi_call_python_org)(struct _cffi_externpy_s *, char *);
 
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
-size_t calculate_j(size_t k, size_t dim[], size_t shp[], size_t sub[]) {
+int calculate_j(int k, int dim[], int shp[], int sub[]) {
 
-    size_t j = dim[0]*((k)%sub[0] + k/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6]*sub[7])%(shp[0]/sub[0])*sub[0])
+    int j = dim[0]*((k)%sub[0] + k/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6]*sub[7])%(shp[0]/sub[0])*sub[0])
         +
         dim[1]*(k/(sub[0])%sub[1]*shp[0] + k/(shp[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6]*sub[7])%(shp[1]/sub[1])*shp[0]*sub[1])
         +
@@ -514,52 +515,56 @@ size_t calculate_j(size_t k, size_t dim[], size_t shp[], size_t sub[]) {
         return j;
 }
 
-void tData_simple(char* src, char* dest, size_t typesize, size_t sub_shape[], size_t shape[], size_t dimension, size_t inverse) {
+void createIndexation(char* keys, int shape[], int sub_shape[], int dimension){
 
-    size_t MAX_DIM = 8;
-    size_t DIM = dimension;
+    int MAX_DIM = 8;
+    int DIM = dimension;
 
-    size_t dim[MAX_DIM], shp[MAX_DIM], sub[MAX_DIM];
+    int s[MAX_DIM], sb[MAX_DIM];
 
-    for (size_t i = 0; i < MAX_DIM; i++) {
+    for (int i = 0; i < MAX_DIM; i++) {
         if (i < DIM) {
-            dim[i] = 1;
-            shp[DIM - i - 1] = shape[i];
-            sub[DIM - i - 1] = sub_shape[i];
+            s[MAX_DIM + i - DIM] = shape[i];
+            sb[MAX_DIM + i - DIM] = sub_shape[i];
         } else {
-            dim[i] = 0;
-            shp[i] = 1;
-            sub[i] = 1;
+            s[MAX_DIM - i - 1] = 1;
+            sb[MAX_DIM - i - 1] = 1;
         }
     }
 
-    size_t j;
+    int cont = 0;
+    uint64_t k;
 
-    if (inverse == 0) {
-        for (size_t k = 0; k < shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*shp[7]; k++) {
+    for (int a=0; a < s[0]; a += sb[0]){
+        for (int b=0; b < s[1]; b += sb[1]){
+            for (int c=0; c < s[2]; c += sb[2]){
+                for (int d=0; d < s[3]; d += sb[3]){
+                    for (int e=0; e < s[4]; e += sb[4]){
+                        for (int f=0; f < s[5]; f += sb[5]){
+                            for (int g=0; g < s[6]; g += sb[6]){
+                                for (int h=0; h < s[7]; h += sb[7]){
 
-            j = calculate_j(k, dim, shp, sub);
+                                     k = h
+                                          + g*s[7]
+                                          + f*s[7]*s[6]
+                                          + e*s[7]*s[6]*s[5]
+                                          + d*s[7]*s[6]*s[5]*s[4]
+                                          + c*s[7]*s[6]*s[5]*s[4]*s[3]
+                                          + b*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]
+                                          + a*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]*s[1];
 
-
-            memcpy(&dest[k * typesize], &src[j * typesize], typesize);
-        }
-    } else {
-        for (size_t k = 0; k < shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*shp[7]; k++) {
-
-            j = calculate_j(k, dim, shp, sub);
-
-            memcpy(&dest[j * typesize], &src[k * typesize], typesize);
+                                     memcpy(&keys[cont * 8], &k, 8);
+                                     cont++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-int tData(char* src, char* dest, size_t typesize, size_t sub_shape[], size_t shape[], size_t dimension, size_t inverse) {
-
-    tData_simple(src, dest, typesize, sub_shape, shape, dimension, inverse);
-    return 1;
-}
-
-int k, k2;
 void padData(char* src, char* dest, int typesize, int shape[], int pad_shape[], int dimension) {
 
     int MAX_DIM = 8;
@@ -577,6 +582,7 @@ void padData(char* src, char* dest, int typesize, int shape[], int pad_shape[], 
         }
     }
 
+    int k, k2;
 
     for (int a = 0; a < s[0]; a++) {
         for (int b = 0; b < s[1]; b++) {
@@ -612,38 +618,108 @@ void padData(char* src, char* dest, int typesize, int shape[], int pad_shape[], 
     }
 }
 
+void tData_simple(char* src, char* dest, int typesize, int sub_shape[], int shape[], int dimension,
+                  int inverse) {
+
+    int MAX_DIM = 8;
+    int DIM = dimension;
+
+    int dim[MAX_DIM], shp[MAX_DIM], sub[MAX_DIM];
+
+    for (int i = 0; i < MAX_DIM; i++) {
+        if (i < DIM) {
+            dim[i] = 1;
+            shp[DIM - i - 1] = shape[i];
+            sub[DIM - i - 1] = sub_shape[i];
+        } else {
+            dim[i] = 0;
+            shp[i] = 1;
+            sub[i] = 1;
+        }
+    }
+
+    int j;
+
+    if (inverse == 0) {
+        for (int k = 0; k < shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*shp[7]; k++) {
+
+            j = calculate_j(k, dim, shp, sub);
+
+
+            memcpy(&dest[k * typesize], &src[j * typesize], typesize);
+        }
+    } else {
+        for (int k = 0; k < shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*shp[7]; k++) {
+
+            j = calculate_j(k, dim, shp, sub);
+
+            memcpy(&dest[j * typesize], &src[k * typesize], typesize);
+        }
+    }
+}
+
+int tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
+          int sub_shape[], int size, int dimension, int inverse) {
+
+
+    char* src_aux = (char *) calloc (size, typesize);
+
+    padData(src, src_aux, typesize, shape, pad_shape, dimension);
+
+    tData_simple(src_aux, dest, typesize, sub_shape, pad_shape, dimension, inverse);
+
+    return 1;
+}
+
 
 /************************************************************/
 
 static void *_cffi_types[] = {
-/*  0 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // size_t()(size_t, size_t *, size_t *, size_t *)
-/*  1 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28), // size_t
-/*  2 */ _CFFI_OP(_CFFI_OP_POINTER, 1), // size_t *
+/*  0 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(int, int *, int *, int *)
+/*  1 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7), // int
+/*  2 */ _CFFI_OP(_CFFI_OP_POINTER, 1), // int *
 /*  3 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /*  4 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /*  5 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION, 24), // void()(char *, char *, int, int *, int *, int)
-/*  7 */ _CFFI_OP(_CFFI_OP_POINTER, 23), // char *
+/*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // void()(char *, char *, int, int *, int *, int *, int, int, int)
+/*  7 */ _CFFI_OP(_CFFI_OP_POINTER, 40), // char *
 /*  8 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/*  9 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7), // int
-/* 10 */ _CFFI_OP(_CFFI_OP_POINTER, 9), // int *
-/* 11 */ _CFFI_OP(_CFFI_OP_NOOP, 10),
-/* 12 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 13 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 14 */ _CFFI_OP(_CFFI_OP_FUNCTION, 24), // void()(char *, char *, size_t, size_t *, size_t *, size_t, size_t)
-/* 15 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 16 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 17 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
-/* 18 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 19 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 20 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
-/* 21 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
-/* 22 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 23 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
-/* 24 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
+/*  9 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 10 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 11 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 12 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 13 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 14 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 15 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 16 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 17 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // void()(char *, char *, int, int *, int *, int)
+/* 18 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 19 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 20 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 21 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 22 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 23 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 24 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 25 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // void()(char *, char *, int, int *, int *, int, int)
+/* 26 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 27 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 28 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 29 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 30 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 31 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 32 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 33 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 34 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // void()(char *, int *, int *, int)
+/* 35 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 36 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 37 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 38 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 39 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 40 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
+/* 41 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
 };
 
-static size_t _cffi_d_calculate_j(size_t x0, size_t * x1, size_t * x2, size_t * x3)
+static int _cffi_d_calculate_j(int x0, int * x1, int * x2, int * x3)
 {
   return calculate_j(x0, x1, x2, x3);
 }
@@ -651,12 +727,12 @@ static size_t _cffi_d_calculate_j(size_t x0, size_t * x1, size_t * x2, size_t * 
 static PyObject *
 _cffi_f_calculate_j(PyObject *self, PyObject *args)
 {
-  size_t x0;
-  size_t * x1;
-  size_t * x2;
-  size_t * x3;
+  int x0;
+  int * x1;
+  int * x2;
+  int * x3;
   Py_ssize_t datasize;
-  size_t result;
+  int result;
   PyObject *arg0;
   PyObject *arg1;
   PyObject *arg2;
@@ -665,8 +741,8 @@ _cffi_f_calculate_j(PyObject *self, PyObject *args)
   if (!PyArg_UnpackTuple(args, "calculate_j", 4, 4, &arg0, &arg1, &arg2, &arg3))
     return NULL;
 
-  x0 = _cffi_to_c_int(arg0, size_t);
-  if (x0 == (size_t)-1 && PyErr_Occurred())
+  x0 = _cffi_to_c_int(arg0, int);
+  if (x0 == (int)-1 && PyErr_Occurred())
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
@@ -674,7 +750,7 @@ _cffi_f_calculate_j(PyObject *self, PyObject *args)
   if (datasize != 0) {
     if (datasize < 0)
       return NULL;
-    x1 = (size_t *)alloca((size_t)datasize);
+    x1 = (int *)alloca((size_t)datasize);
     memset((void *)x1, 0, (size_t)datasize);
     if (_cffi_convert_array_from_object((char *)x1, _cffi_type(2), arg1) < 0)
       return NULL;
@@ -685,7 +761,7 @@ _cffi_f_calculate_j(PyObject *self, PyObject *args)
   if (datasize != 0) {
     if (datasize < 0)
       return NULL;
-    x2 = (size_t *)alloca((size_t)datasize);
+    x2 = (int *)alloca((size_t)datasize);
     memset((void *)x2, 0, (size_t)datasize);
     if (_cffi_convert_array_from_object((char *)x2, _cffi_type(2), arg2) < 0)
       return NULL;
@@ -696,7 +772,7 @@ _cffi_f_calculate_j(PyObject *self, PyObject *args)
   if (datasize != 0) {
     if (datasize < 0)
       return NULL;
-    x3 = (size_t *)alloca((size_t)datasize);
+    x3 = (int *)alloca((size_t)datasize);
     memset((void *)x3, 0, (size_t)datasize);
     if (_cffi_convert_array_from_object((char *)x3, _cffi_type(2), arg3) < 0)
       return NULL;
@@ -709,10 +785,82 @@ _cffi_f_calculate_j(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  return _cffi_from_c_int(result, size_t);
+  return _cffi_from_c_int(result, int);
 }
 #else
 #  define _cffi_f_calculate_j _cffi_d_calculate_j
+#endif
+
+static void _cffi_d_createIndexation(char * x0, int * x1, int * x2, int x3)
+{
+  createIndexation(x0, x1, x2, x3);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_createIndexation(PyObject *self, PyObject *args)
+{
+  char * x0;
+  int * x1;
+  int * x2;
+  int x3;
+  Py_ssize_t datasize;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+  PyObject *arg3;
+
+  if (!PyArg_UnpackTuple(args, "createIndexation", 4, 4, &arg0, &arg1, &arg2, &arg3))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(7), arg0, (char **)&x0);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x0 = (char *)alloca((size_t)datasize);
+    memset((void *)x0, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x0, _cffi_type(7), arg0) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(2), arg1, (char **)&x1);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x1 = (int *)alloca((size_t)datasize);
+    memset((void *)x1, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x1, _cffi_type(2), arg1) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(2), arg2, (char **)&x2);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x2 = (int *)alloca((size_t)datasize);
+    memset((void *)x2, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x2, _cffi_type(2), arg2) < 0)
+      return NULL;
+  }
+
+  x3 = _cffi_to_c_int(arg3, int);
+  if (x3 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { createIndexation(x0, x1, x2, x3); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+#else
+#  define _cffi_f_createIndexation _cffi_d_createIndexation
 #endif
 
 static void _cffi_d_padData(char * x0, char * x1, int x2, int * x3, int * x4, int x5)
@@ -767,24 +915,24 @@ _cffi_f_padData(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(10), arg3, (char **)&x3);
+      _cffi_type(2), arg3, (char **)&x3);
   if (datasize != 0) {
     if (datasize < 0)
       return NULL;
     x3 = (int *)alloca((size_t)datasize);
     memset((void *)x3, 0, (size_t)datasize);
-    if (_cffi_convert_array_from_object((char *)x3, _cffi_type(10), arg3) < 0)
+    if (_cffi_convert_array_from_object((char *)x3, _cffi_type(2), arg3) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(10), arg4, (char **)&x4);
+      _cffi_type(2), arg4, (char **)&x4);
   if (datasize != 0) {
     if (datasize < 0)
       return NULL;
     x4 = (int *)alloca((size_t)datasize);
     memset((void *)x4, 0, (size_t)datasize);
-    if (_cffi_convert_array_from_object((char *)x4, _cffi_type(10), arg4) < 0)
+    if (_cffi_convert_array_from_object((char *)x4, _cffi_type(2), arg4) < 0)
       return NULL;
   }
 
@@ -806,9 +954,9 @@ _cffi_f_padData(PyObject *self, PyObject *args)
 #  define _cffi_f_padData _cffi_d_padData
 #endif
 
-static void _cffi_d_tData(char * x0, char * x1, size_t x2, size_t * x3, size_t * x4, size_t x5, size_t x6)
+static void _cffi_d_tData(char * x0, char * x1, int x2, int * x3, int * x4, int * x5, int x6, int x7, int x8)
 {
-  tData(x0, x1, x2, x3, x4, x5, x6);
+  tData(x0, x1, x2, x3, x4, x5, x6, x7, x8);
 }
 #ifndef PYPY_VERSION
 static PyObject *
@@ -816,11 +964,13 @@ _cffi_f_tData(PyObject *self, PyObject *args)
 {
   char * x0;
   char * x1;
-  size_t x2;
-  size_t * x3;
-  size_t * x4;
-  size_t x5;
-  size_t x6;
+  int x2;
+  int * x3;
+  int * x4;
+  int * x5;
+  int x6;
+  int x7;
+  int x8;
   Py_ssize_t datasize;
   PyObject *arg0;
   PyObject *arg1;
@@ -829,8 +979,10 @@ _cffi_f_tData(PyObject *self, PyObject *args)
   PyObject *arg4;
   PyObject *arg5;
   PyObject *arg6;
+  PyObject *arg7;
+  PyObject *arg8;
 
-  if (!PyArg_UnpackTuple(args, "tData", 7, 7, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6))
+  if (!PyArg_UnpackTuple(args, "tData", 9, 9, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8))
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
@@ -855,8 +1007,8 @@ _cffi_f_tData(PyObject *self, PyObject *args)
       return NULL;
   }
 
-  x2 = _cffi_to_c_int(arg2, size_t);
-  if (x2 == (size_t)-1 && PyErr_Occurred())
+  x2 = _cffi_to_c_int(arg2, int);
+  if (x2 == (int)-1 && PyErr_Occurred())
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
@@ -864,7 +1016,7 @@ _cffi_f_tData(PyObject *self, PyObject *args)
   if (datasize != 0) {
     if (datasize < 0)
       return NULL;
-    x3 = (size_t *)alloca((size_t)datasize);
+    x3 = (int *)alloca((size_t)datasize);
     memset((void *)x3, 0, (size_t)datasize);
     if (_cffi_convert_array_from_object((char *)x3, _cffi_type(2), arg3) < 0)
       return NULL;
@@ -875,23 +1027,38 @@ _cffi_f_tData(PyObject *self, PyObject *args)
   if (datasize != 0) {
     if (datasize < 0)
       return NULL;
-    x4 = (size_t *)alloca((size_t)datasize);
+    x4 = (int *)alloca((size_t)datasize);
     memset((void *)x4, 0, (size_t)datasize);
     if (_cffi_convert_array_from_object((char *)x4, _cffi_type(2), arg4) < 0)
       return NULL;
   }
 
-  x5 = _cffi_to_c_int(arg5, size_t);
-  if (x5 == (size_t)-1 && PyErr_Occurred())
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(2), arg5, (char **)&x5);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x5 = (int *)alloca((size_t)datasize);
+    memset((void *)x5, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x5, _cffi_type(2), arg5) < 0)
+      return NULL;
+  }
+
+  x6 = _cffi_to_c_int(arg6, int);
+  if (x6 == (int)-1 && PyErr_Occurred())
     return NULL;
 
-  x6 = _cffi_to_c_int(arg6, size_t);
-  if (x6 == (size_t)-1 && PyErr_Occurred())
+  x7 = _cffi_to_c_int(arg7, int);
+  if (x7 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x8 = _cffi_to_c_int(arg8, int);
+  if (x8 == (int)-1 && PyErr_Occurred())
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
   _cffi_restore_errno();
-  { tData(x0, x1, x2, x3, x4, x5, x6); }
+  { tData(x0, x1, x2, x3, x4, x5, x6, x7, x8); }
   _cffi_save_errno();
   Py_END_ALLOW_THREADS
 
@@ -903,7 +1070,7 @@ _cffi_f_tData(PyObject *self, PyObject *args)
 #  define _cffi_f_tData _cffi_d_tData
 #endif
 
-static void _cffi_d_tData_simple(char * x0, char * x1, size_t x2, size_t * x3, size_t * x4, size_t x5, size_t x6)
+static void _cffi_d_tData_simple(char * x0, char * x1, int x2, int * x3, int * x4, int x5, int x6)
 {
   tData_simple(x0, x1, x2, x3, x4, x5, x6);
 }
@@ -913,11 +1080,11 @@ _cffi_f_tData_simple(PyObject *self, PyObject *args)
 {
   char * x0;
   char * x1;
-  size_t x2;
-  size_t * x3;
-  size_t * x4;
-  size_t x5;
-  size_t x6;
+  int x2;
+  int * x3;
+  int * x4;
+  int x5;
+  int x6;
   Py_ssize_t datasize;
   PyObject *arg0;
   PyObject *arg1;
@@ -952,8 +1119,8 @@ _cffi_f_tData_simple(PyObject *self, PyObject *args)
       return NULL;
   }
 
-  x2 = _cffi_to_c_int(arg2, size_t);
-  if (x2 == (size_t)-1 && PyErr_Occurred())
+  x2 = _cffi_to_c_int(arg2, int);
+  if (x2 == (int)-1 && PyErr_Occurred())
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
@@ -961,7 +1128,7 @@ _cffi_f_tData_simple(PyObject *self, PyObject *args)
   if (datasize != 0) {
     if (datasize < 0)
       return NULL;
-    x3 = (size_t *)alloca((size_t)datasize);
+    x3 = (int *)alloca((size_t)datasize);
     memset((void *)x3, 0, (size_t)datasize);
     if (_cffi_convert_array_from_object((char *)x3, _cffi_type(2), arg3) < 0)
       return NULL;
@@ -972,18 +1139,18 @@ _cffi_f_tData_simple(PyObject *self, PyObject *args)
   if (datasize != 0) {
     if (datasize < 0)
       return NULL;
-    x4 = (size_t *)alloca((size_t)datasize);
+    x4 = (int *)alloca((size_t)datasize);
     memset((void *)x4, 0, (size_t)datasize);
     if (_cffi_convert_array_from_object((char *)x4, _cffi_type(2), arg4) < 0)
       return NULL;
   }
 
-  x5 = _cffi_to_c_int(arg5, size_t);
-  if (x5 == (size_t)-1 && PyErr_Occurred())
+  x5 = _cffi_to_c_int(arg5, int);
+  if (x5 == (int)-1 && PyErr_Occurred())
     return NULL;
 
-  x6 = _cffi_to_c_int(arg6, size_t);
-  if (x6 == (size_t)-1 && PyErr_Occurred())
+  x6 = _cffi_to_c_int(arg6, int);
+  if (x6 == (int)-1 && PyErr_Occurred())
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
@@ -1002,9 +1169,10 @@ _cffi_f_tData_simple(PyObject *self, PyObject *args)
 
 static const struct _cffi_global_s _cffi_globals[] = {
   { "calculate_j", (void *)_cffi_f_calculate_j, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 0), (void *)_cffi_d_calculate_j },
-  { "padData", (void *)_cffi_f_padData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 6), (void *)_cffi_d_padData },
-  { "tData", (void *)_cffi_f_tData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 14), (void *)_cffi_d_tData },
-  { "tData_simple", (void *)_cffi_f_tData_simple, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 14), (void *)_cffi_d_tData_simple },
+  { "createIndexation", (void *)_cffi_f_createIndexation, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 34), (void *)_cffi_d_createIndexation },
+  { "padData", (void *)_cffi_f_padData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 17), (void *)_cffi_d_padData },
+  { "tData", (void *)_cffi_f_tData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 6), (void *)_cffi_d_tData },
+  { "tData_simple", (void *)_cffi_f_tData_simple, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 25), (void *)_cffi_d_tData_simple },
 };
 
 static const struct _cffi_type_context_s _cffi_type_context = {
@@ -1014,12 +1182,12 @@ static const struct _cffi_type_context_s _cffi_type_context = {
   NULL,  /* no struct_unions */
   NULL,  /* no enums */
   NULL,  /* no typenames */
-  4,  /* num_globals */
+  5,  /* num_globals */
   0,  /* num_struct_unions */
   0,  /* num_enums */
   0,  /* num_typenames */
   NULL,  /* no includes */
-  25,  /* num_types */
+  42,  /* num_types */
   0,  /* flags */
 };
 
