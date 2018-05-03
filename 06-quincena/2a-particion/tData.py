@@ -110,6 +110,7 @@ ffibuilder.set_source("tData",
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include "uthash.h"
 
 int calculate_j(int k, int dim[], int shp[], int sub[]) {
 

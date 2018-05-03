@@ -493,6 +493,7 @@ static void (*_cffi_call_python_org)(struct _cffi_externpy_s *, char *);
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include "uthash.h"
 
 int calculate_j(int k, int dim[], int shp[], int sub[]) {
 

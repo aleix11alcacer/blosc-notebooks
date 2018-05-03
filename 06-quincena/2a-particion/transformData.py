@@ -130,7 +130,7 @@ def obtainIndex(dim, dic, s, ps):
                             for g in range(dim[6][0]//ps[6]*ps[6], dim[6][1], ps[6]):
                                 for h in range(dim[7][0]//ps[7]*ps[7], dim[7][1], ps[7]):
 
-                                    K = (h
+                                    k = (h
                                          + g*s[7]
                                          + f*s[7]*s[6]
                                          + e*s[7]*s[6]*s[5]
@@ -139,7 +139,7 @@ def obtainIndex(dim, dic, s, ps):
                                          + b*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]
                                          + a*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]*s[1])
 
-                                    ind.append(((a, b, c, d, e, f, g, h), dic[K]))
+                                    ind.append((k, dic[k]))
     return ind
 
 
@@ -275,12 +275,20 @@ def decompress_trans(comp, indexation, dtype, s, ts, ps, a=-1, b=-1, c=-1, d=-1,
 
     dest = np.zeros(np.prod(subpl), dtype=dtype)
 
-    for i, ((a, b, c, d, e, f, g, h), n) in enumerate(ind):
+    for i, (k, n) in enumerate(ind):
 
         aux = get_block(comp, n, ps, dtype)
 
-        cont = 0
+        h = k % subpl[7]
+        g = k // (subpl[7])
+        f = k // (subpl[7]*subpl[6])
+        e = k // (subpl[7]*subpl[6]*subpl[5])
+        d = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4])
+        c = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3])
+        b = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2])
+        a = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1])
 
+        cont = 0
         for ra in range(a, a + ps[0]):
             for rb in range(b, b + ps[1]):
                 for rc in range(c, c + ps[2]):
@@ -298,8 +306,7 @@ def decompress_trans(comp, indexation, dtype, s, ts, ps, a=-1, b=-1, c=-1, d=-1,
                                          + rb*subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]
                                          + ra*subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1]) // ps[7]
 
-                                    dest[n * ps[7]: (n+1) * ps[7]] = aux[cont * ps[7]: (cont+1) * ps[7]]
+                                    dest[n % np.prod(subpl) * ps[7]: (n % np.prod(subpl)+1) * ps[7]] = aux[cont * ps[7]: (cont+1) * ps[7]]
                                     cont += 1
-
 
     return dest.reshape(subpl[-dimension:])
