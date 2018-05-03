@@ -7,7 +7,7 @@ from tData import ffi, lib
 import pycblosc2 as cb2
 
 
-def tData(src, sub_shp, inverse=False):
+def tData(src, ps, inverse=False):
     """
     Apply a data transformation based in reorganize data partitions.
 
@@ -15,7 +15,7 @@ def tData(src, sub_shp, inverse=False):
     ----------
     src : np.array
         Data to transform.
-    sub_shp: int[] or tuple
+    ps: int[] or tuple
         Data partition shape.
     inverse: bool, optional
 
@@ -35,19 +35,19 @@ def tData(src, sub_shp, inverse=False):
 
     # Calculate the extended dataset parameters
 
-    pad_shp = []
+    ts = []
 
     for i in range(len(shape)):
         d = shape[i]
-        if shape[i] % sub_shp[i] != 0:
-            d = shape[i] + sub_shp[i] - shape[i] % sub_shp[i]
-        pad_shp.append(d)
+        if shape[i] % ps[i] != 0:
+            d = shape[i] + ps[i] - shape[i] % ps[i]
+        ts.append(d)
 
-    size = np.prod(pad_shp)
+    size = np.prod(ts)
 
     # Create destination dataset
 
-    dest = np.empty(size, dtype=src.dtype).reshape(pad_shp)
+    dest = np.empty(size, dtype=src.dtype).reshape(ts)
 
     # Transform datasets to buffers (for use in cffi)
 
@@ -56,29 +56,16 @@ def tData(src, sub_shp, inverse=False):
 
     # Execute the transformation
 
-    lib.tData(src_b, dest_b, typesize, shape, pad_shp, sub_shp, size, dimension, inverse)
+    inv = 1 if inverse else 0
 
-    d = createIndexation(pad_shp, sub_shp)
+    lib.tData(src_b, dest_b, typesize, shape, ts, ps, size, dimension, inv)
+
+    d = createIndexation(ts, ps)
 
     return dest, d
 
 
-def reorder_dim(dim, l):
-    aux = []
-    for i in range(len(dim)):
-        aux.append(dim[(i+l) % len(dim)])
-    return aux
-
-
-def create_shape(s):
-    s_aux = [1, 1, 1, 1, 1, 1, 1, 1]
-
-    for i in range(len(s)):
-        s_aux[-len(s) + i] = s[i]
-    return s_aux
-
-
-def createIndexation(shape, sub_shp):
+def createIndexation(shape, ps):
     """
     Create an indexation of data partitions.
 
@@ -86,7 +73,7 @@ def createIndexation(shape, sub_shp):
     ----------
     shape : int[] or tuple
         Data shape.
-    sub_shp: int[] or tuple
+    ps: int[] or tuple
         Data partition shape.
 
     Returns
@@ -101,7 +88,7 @@ def createIndexation(shape, sub_shp):
 
     # Calculate the partitions the size
 
-    size = int(np.prod(shape)/np.prod(sub_shp))
+    size = int(np.prod(shape)/np.prod(ps))
 
     keys = np.zeros(size, dtype=np.int64)
 
@@ -109,7 +96,7 @@ def createIndexation(shape, sub_shp):
 
     # Create the indexation
 
-    lib.createIndexation(k_b, shape, sub_shp, dimension)
+    lib.createIndexation(k_b, shape, ps, dimension)
 
     # Create a dicttionary with keys and values
 
@@ -118,21 +105,30 @@ def createIndexation(shape, sub_shp):
     return d
 
 
-def obtainIndex(dim, dic, s, sb):
+def obtainIndex(dim, dic, s, ps):
 
-    s = create_shape(s)
-    sb = create_shape(sb)
+    dimension = len(s)
+
+    s_aux = [1, 1, 1, 1, 1, 1, 1, 1]
+    ps_aux = [1, 1, 1, 1, 1, 1, 1, 1]
+
+    for i in range(dimension):
+        s_aux[-dimension + i] = s[i]
+        ps_aux[-dimension + i] = ps[i]
+
+    ps = ps_aux
+    s = s_aux
 
     ind = []
 
-    for a in range(dim[0][0]//sb[0]*sb[0], dim[0][1], sb[0]):
-        for b in range(dim[1][0]//sb[1]*sb[1], dim[1][1], sb[1]):
-            for c in range(dim[2][0]//sb[2]*sb[2], dim[2][1], sb[2]):
-                for d in range(dim[3][0]//sb[3]*sb[3], dim[3][1], sb[3]):
-                    for e in range(dim[4][0]//sb[4]*sb[4], dim[4][1], sb[4]):
-                        for f in range(dim[5][0]//sb[5]*sb[5], dim[5][1], sb[5]):
-                            for g in range(dim[6][0]//sb[6]*sb[6], dim[6][1], sb[6]):
-                                for h in range(dim[7][0]//sb[7]*sb[7], dim[7][1], sb[7]):
+    for a in range(dim[0][0]//ps[0]*ps[0], dim[0][1], ps[0]):
+        for b in range(dim[1][0]//ps[1]*ps[1], dim[1][1], ps[1]):
+            for c in range(dim[2][0]//ps[2]*ps[2], dim[2][1], ps[2]):
+                for d in range(dim[3][0]//ps[3]*ps[3], dim[3][1], ps[3]):
+                    for e in range(dim[4][0]//ps[4]*ps[4], dim[4][1], ps[4]):
+                        for f in range(dim[5][0]//ps[5]*ps[5], dim[5][1], ps[5]):
+                            for g in range(dim[6][0]//ps[6]*ps[6], dim[6][1], ps[6]):
+                                for h in range(dim[7][0]//ps[7]*ps[7], dim[7][1], ps[7]):
 
                                     K = (h
                                          + g*s[7]
@@ -150,14 +146,30 @@ def obtainIndex(dim, dic, s, sb):
 # Compression/decompression functions
 
 
-def compress(src, pad_shp):
+def compress(src, ps):
+    """
+    Compress data.
+
+    Parameters
+    ----------
+    src : np.array
+        Data to compress.
+    ps: int[] or tuple
+        Data partition shape.
+
+    Returns
+    -------
+    dest : chunk
+        Data compressed.
+    """
+
     size = src.size
     itemsize = src.dtype.itemsize
     bsize = size * itemsize
 
     dest = np.empty(size, dtype=src.dtype)
 
-    cb2.blosc_set_blocksize(np.prod(pad_shp) * itemsize)
+    cb2.blosc_set_blocksize(np.prod(ps) * itemsize)
 
     size_c = cb2.blosc_compress(5, 1, itemsize, bsize, src, dest, bsize)
 
@@ -165,6 +177,25 @@ def compress(src, pad_shp):
 
 
 def decompress(comp, s, itemsize, dtype):
+    """
+    Decompress data.
+
+    Parameters
+    ----------
+    comp : chunk
+        Data compressed.
+    s: int[] or tuple
+        Original data shape.
+    itemsize: int
+        Data item size.
+    dtype: np.type
+        Data type.
+
+    Returns
+    -------
+    dest : np.array
+        Data decompressed.
+    """
 
     size = np.prod(s)
     bsize = size * itemsize
@@ -176,9 +207,28 @@ def decompress(comp, s, itemsize, dtype):
     return dest
 
 
-def get_block(comp, index, pad_shp, dtype):
+def get_block(comp, index, ps, dtype):
+    """
+    Extract a block of compressed data.
 
-    size = np.prod(pad_shp)
+    Parameters
+    ----------
+    comp : chunk
+        Data compressed.
+    index: int
+        Number of block to decompress.
+    ps: int[] or tuple
+        Data partition shape.
+    dtype: np.type
+        Data type.
+
+    Returns
+    -------
+    dest : np.array
+        Data compressed.
+    """
+
+    size = np.prod(ps)
 
     dest = np.empty(size, dtype=dtype)
 
@@ -187,48 +237,69 @@ def get_block(comp, index, pad_shp, dtype):
     return dest
 
 
-def decompress_trans(comp, indexation, dtype, s, ts, sb, a=None, b=None, c=None, d=None,
-                     e=None, f=None, g=None, h=None):
+def decompress_trans(comp, indexation, dtype, s, ts, ps, a=-1, b=-1, c=-1, d=-1,
+                     e=-1, f=-1, g=-1, h=-1):
 
-    dim = reorder_dim([a, b, c, d, e, f, g, h], len(s))
+    dimension = len(s)
+    dim = [a, b, c, d, e, f, g, h][:-dimension]
 
-    s = create_shape(s)
-    ts = create_shape(ts)
-    sb = create_shape(sb)
-
+    s_aux = [1, 1, 1, 1, 1, 1, 1, 1]
+    ts_aux = [1, 1, 1, 1, 1, 1, 1, 1]
+    ps_aux = [1, 1, 1, 1, 1, 1, 1, 1]
+    dim_aux = [-1, -1, -1, -1, -1, -1, -1, -1]
     index_aux = [1, 1, 1, 1, 1, 1, 1, 1]
+
+    for i in range(dimension):
+        s_aux[-dimension + i] = s[i]
+        ts_aux[-dimension + i] = ts[i]
+        ps_aux[-dimension + i] = ps[i]
+        dim_aux[-dimension - i] = dim[i]
+    ts = ts_aux
+    ps = ps_aux
+    s = s_aux
+    dim = dim_aux
+
     ul = np.copy(ts)
     ui = [(0, ts[0]), (0, ts[1]), (0, ts[2]), (0, ts[3]), (0, ts[4]), (0, ts[5]), (0, ts[6]),
           (0, ts[7])]
 
     for i in range(len(index_aux)):
-        if dim[i] is not None:
-            ul[i] = sb[i]
+        if dim[i] != -1:
+            ul[i] = ps[i]
             ui[i] = (dim[i], dim[i]+1)
             index_aux[i] = 0
-            dim[i] = dim[i] % ul[i]
-        else:
-            dim[i] = slice(0, s[i])
 
     subpl = ul
 
-    ind = obtainIndex(ui, indexation, ts, sb)
+    ind = obtainIndex(ui, indexation, ts, ps)
 
-    dest = np.zeros(np.prod(subpl), dtype=dtype).reshape(subpl)
+    dest = np.zeros(np.prod(subpl), dtype=dtype)
 
-    for index, n in ind:
+    for i, ((a, b, c, d, e, f, g, h), n) in enumerate(ind):
 
-        index = [index[q]*index_aux[q] for q in range(len(dim))]
+        aux = get_block(comp, n, ps, dtype)
 
-        aux = get_block(comp, n, sb, dtype).reshape(sb)
+        cont = 0
 
-        dest[index[0]:index[0]+sb[0],
-             index[1]:index[1]+sb[1],
-             index[2]:index[2]+sb[2],
-             index[3]:index[3]+sb[3],
-             index[4]:index[4]+sb[4],
-             index[5]:index[5]+sb[5],
-             index[6]:index[6]+sb[6],
-             index[7]:index[7]+sb[7]] = aux
+        for ra in range(a, a + ps[0]):
+            for rb in range(b, b + ps[1]):
+                for rc in range(c, c + ps[2]):
+                    for rd in range(d, d + ps[3]):
+                        for re in range(e, e + ps[4]):
+                            for rf in range(f, f + ps[5]):
+                                for rg in range(g, g + ps[6]):
 
-    return dest[dim]
+                                    n = (h
+                                         + rg*subpl[7]
+                                         + rf*subpl[7]*subpl[6]
+                                         + re*subpl[7]*subpl[6]*subpl[5]
+                                         + rd*subpl[7]*subpl[6]*subpl[5]*subpl[4]
+                                         + rc*subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]
+                                         + rb*subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]
+                                         + ra*subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1]) // ps[7]
+
+                                    dest[n * ps[7]: (n+1) * ps[7]] = aux[cont * ps[7]: (cont+1) * ps[7]]
+                                    cont += 1
+
+
+    return dest.reshape(subpl[-dimension:])
