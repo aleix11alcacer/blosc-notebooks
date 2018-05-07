@@ -28,7 +28,7 @@ def tData(src, ps, inverse=False):
     """
 
     # Obtain src parameters
-
+    print("empieza aquí")
     typesize = src.dtype.itemsize
     shape = src.shape
     dimension = len(shape)
@@ -273,6 +273,8 @@ def decompress_trans(comp, indexation, dtype, s, ts, ps, a=-1, b=-1, c=-1, d=-1,
 
     ind = obtainIndex(ui, indexation, ts, ps)
 
+    print(np.prod(subpl))
+
     dest = np.zeros(np.prod(subpl), dtype=dtype)
 
     for i, (k, n) in enumerate(ind):
@@ -280,15 +282,16 @@ def decompress_trans(comp, indexation, dtype, s, ts, ps, a=-1, b=-1, c=-1, d=-1,
         aux = get_block(comp, n, ps, dtype)
 
         h = k % subpl[7]
-        g = k // (subpl[7])
-        f = k // (subpl[7]*subpl[6])
-        e = k // (subpl[7]*subpl[6]*subpl[5])
-        d = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4])
-        c = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3])
-        b = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2])
-        a = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1])
+        g = k // (subpl[7]) % subpl[6]
+        f = k // (subpl[7]*subpl[6]) % subpl[5]
+        e = k // (subpl[7]*subpl[6]*subpl[5]) % subpl[4]
+        d = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]) % subpl[3]
+        c = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]) % subpl[2]
+        b = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]) % subpl[1]
+        a = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1]) % subpl[0]
 
         cont = 0
+
         for ra in range(a, a + ps[0]):
             for rb in range(b, b + ps[1]):
                 for rc in range(c, c + ps[2]):
