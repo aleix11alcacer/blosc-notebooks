@@ -492,6 +492,7 @@ static void (*_cffi_call_python_org)(struct _cffi_externpy_s *, char *);
 
 #include <stdio.h>
 #include <stdint.h>
+#include <blosc.h>
 
 
 int calculate_j(int k, int dim[], int shp[], int sub[]) {
@@ -516,8 +517,6 @@ int calculate_j(int k, int dim[], int shp[], int sub[]) {
 }
 
 void createIndexation(char* keys, int shape[], int sub_shape[], int dimension){
-
-    // printf("Hola");
 
     int MAX_DIM = 8;
     int DIM = dimension;
@@ -564,8 +563,6 @@ void createIndexation(char* keys, int shape[], int sub_shape[], int dimension){
                                              + f/sb[5]*sd[6]*sd[7]
                                              + g/sb[6]*sd[7]
                                              + h/sb[7];
-
-                                     printf("%llu - %llu", k, cont);
 
                                      memcpy(&keys[cont * 8], &k, 8);
                                      cont++;
@@ -684,6 +681,129 @@ void tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
 
 }
 
+void compress_trans(char* comp,char* dest, int trans_shape[], int part_shape[], int dimensions[],
+                    int sub_trans[], int dimension, int b_size, int typesize){
+
+    int MAX_DIM = 8;
+    int DIM = dimension;
+
+    int subpl[MAX_DIM], ts[MAX_DIM], ps[MAX_DIM], dim[MAX_DIM], sd[MAX_DIM];
+
+    for (int i = 0; i < MAX_DIM; i++) {
+        if (i < DIM) {
+            ts[MAX_DIM + i - DIM] = trans_shape[i];
+            ps[MAX_DIM + i - DIM] = part_shape[i];
+            dim[MAX_DIM + i - DIM] = dimensions[i];
+            subpl[MAX_DIM + i - DIM] = sub_trans[i];
+            sd[MAX_DIM + i - DIM] = trans_shape[i]/part_shape[i];
+
+        } else {
+            ts[MAX_DIM - i - 1] = 1;
+            ps[MAX_DIM - i - 1] = 1;
+            dim[MAX_DIM - i - 1] = -1;
+            sd[MAX_DIM - i - 1] = 1;
+            subpl[MAX_DIM - i - 1] = 1;
+
+        }
+
+    }
+
+    int oi_s[MAX_DIM], oi_f[MAX_DIM];
+
+
+    for (int i = 0; i < MAX_DIM; i++) {
+        if (dim[i] != -1) {
+            oi_s[i] = dim[i];
+            oi_f[i] = dim[i] + 1;
+        } else {
+            oi_s[i] = 0;
+            oi_f[i] = ts[i];
+        }
+    }
+
+    char *aux = malloc(b_size * typesize);
+
+    int k, n;
+
+    for (int a = oi_s[0]/ps[0]*ps[0]; a < oi_f[0]; a += ps[0]) {
+        for (int b = oi_s[1]/ps[1]*ps[1]; b < oi_f[1]; b += ps[1]) {
+            for (int c = oi_s[2]/ps[2]*ps[2]; c < oi_f[2]; c += ps[2]) {
+                for (int d = oi_s[3]/ps[3]*ps[3]; d < oi_f[3]; d += ps[3]) {
+                    for (int e = oi_s[4]/ps[4]*ps[4]; e < oi_f[4]; e += ps[4]) {
+                        for (int f = oi_s[5]/ps[5]*ps[5]; f < oi_f[5]; f += ps[5]) {
+                            for (int g = oi_s[6]/ps[6]*ps[6]; g < oi_f[6]; g += ps[6]) {
+                                for (int h = oi_s[7]/ps[7]*ps[7]; h < oi_f[7]; h += ps[7]) {
+
+                                    k = h
+                                         + g*ts[7]
+                                         + f*ts[7]*ts[6]
+                                         + e*ts[7]*ts[6]*ts[5]
+                                         + d*ts[7]*ts[6]*ts[5]*ts[4]
+                                         + c*ts[7]*ts[6]*ts[5]*ts[4]*ts[3]
+                                         + b*ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]
+                                         + a*ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]*ts[1];
+
+                                     n = a/ps[0]*sd[1]*sd[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
+                                        + b/ps[1]*sd[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
+                                        + c/ps[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
+                                        + d/ps[3]*sd[4]*sd[5]*sd[6]*sd[7]
+                                        + e/ps[4]*sd[5]*sd[6]*sd[7]
+                                        + f/ps[5]*sd[6]*sd[7]
+                                        + g/ps[6]*sd[7]
+                                        + h/ps[7];
+
+                                    blosc_getitem(comp, n * b_size, b_size, aux);
+
+                                    int h2 = k % ts[7] % subpl[7];
+                                    int g2 = k / (ts[7]) % subpl[6];
+                                    int f2 = k / (ts[7]*ts[6]) % subpl[5];
+                                    int e2 = k / (ts[7]*ts[6]*ts[5]) % subpl[4];
+                                    int d2 = k / (ts[7]*ts[6]*ts[5]*ts[4]) % subpl[3];
+                                    int c2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]) % subpl[2];
+                                    int b2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]) % subpl[1];
+                                    int a2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]*ts[1]) % subpl[0];
+
+                                    int cont = 0;
+
+                                    for (int ra = a2; ra < a2 + ps[0]; ra++) {
+                                        for (int rb = b2; rb < b2 + ps[1]; rb++) {
+                                            for (int rc = c2; rc < c2 + ps[2]; rc++) {
+                                                for (int rd = d2; rd < d2 + ps[3]; rd++) {
+                                                    for (int re = e2; re < e2 + ps[4]; re++) {
+                                                        for (int rf = f2; rf < f2 + ps[5]; rf++) {
+                                                            for (int rg = g2; rg < g2 + ps[6]; rg++) {
+
+                                                                k = h2
+                                                                     + rg * subpl[7]
+                                                                     + rf * subpl[7]*subpl[6]
+                                                                     + re * subpl[7]*subpl[6]*subpl[5]
+                                                                     + rd * subpl[7]*subpl[6]*subpl[5]*subpl[4]
+                                                                     + rc * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]
+                                                                     + rb * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]
+                                                                     + ra * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1];
+
+                                                                memcpy(&dest[k * typesize], &aux[cont * typesize], ps[7] * typesize);
+                                                                cont += ps[7];
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+       }
+    }
+
+}
+
+
 
 /************************************************************/
 
@@ -694,10 +814,10 @@ static void *_cffi_types[] = {
 /*  3 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /*  4 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /*  5 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // void()(char *, char *, int, int *, int *, int *, int, int, int)
-/*  7 */ _CFFI_OP(_CFFI_OP_POINTER, 40), // char *
+/*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION, 52), // void()(char *, char *, int *, int *, int *, int *, int, int, int)
+/*  7 */ _CFFI_OP(_CFFI_OP_POINTER, 51), // char *
 /*  8 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/*  9 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/*  9 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /* 10 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /* 11 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /* 12 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
@@ -705,31 +825,42 @@ static void *_cffi_types[] = {
 /* 14 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 15 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 16 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 17 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // void()(char *, char *, int, int *, int *, int)
+/* 17 */ _CFFI_OP(_CFFI_OP_FUNCTION, 52), // void()(char *, char *, int, int *, int *, int *, int, int, int)
 /* 18 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 19 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 20 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 21 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /* 22 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 23 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 24 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 25 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // void()(char *, char *, int, int *, int *, int, int)
-/* 26 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 27 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 28 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 29 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 30 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 23 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 24 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 25 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 26 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 27 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 28 */ _CFFI_OP(_CFFI_OP_FUNCTION, 52), // void()(char *, char *, int, int *, int *, int)
+/* 29 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 30 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 31 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 32 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 33 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 34 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // void()(char *, int *, int *, int)
-/* 35 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 36 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 37 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 38 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 39 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 40 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
-/* 41 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
+/* 32 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 33 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 34 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 35 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 36 */ _CFFI_OP(_CFFI_OP_FUNCTION, 52), // void()(char *, char *, int, int *, int *, int, int)
+/* 37 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 38 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 39 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 40 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 41 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 42 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 43 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 44 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 45 */ _CFFI_OP(_CFFI_OP_FUNCTION, 52), // void()(char *, int *, int *, int)
+/* 46 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 47 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 48 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 49 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 50 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 51 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
+/* 52 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
 };
 
 static int _cffi_d_calculate_j(int x0, int * x1, int * x2, int * x3)
@@ -802,6 +933,129 @@ _cffi_f_calculate_j(PyObject *self, PyObject *args)
 }
 #else
 #  define _cffi_f_calculate_j _cffi_d_calculate_j
+#endif
+
+static void _cffi_d_compress_trans(char * x0, char * x1, int * x2, int * x3, int * x4, int * x5, int x6, int x7, int x8)
+{
+  compress_trans(x0, x1, x2, x3, x4, x5, x6, x7, x8);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_compress_trans(PyObject *self, PyObject *args)
+{
+  char * x0;
+  char * x1;
+  int * x2;
+  int * x3;
+  int * x4;
+  int * x5;
+  int x6;
+  int x7;
+  int x8;
+  Py_ssize_t datasize;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+  PyObject *arg3;
+  PyObject *arg4;
+  PyObject *arg5;
+  PyObject *arg6;
+  PyObject *arg7;
+  PyObject *arg8;
+
+  if (!PyArg_UnpackTuple(args, "compress_trans", 9, 9, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(7), arg0, (char **)&x0);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x0 = (char *)alloca((size_t)datasize);
+    memset((void *)x0, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x0, _cffi_type(7), arg0) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(7), arg1, (char **)&x1);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x1 = (char *)alloca((size_t)datasize);
+    memset((void *)x1, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x1, _cffi_type(7), arg1) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(2), arg2, (char **)&x2);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x2 = (int *)alloca((size_t)datasize);
+    memset((void *)x2, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x2, _cffi_type(2), arg2) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(2), arg3, (char **)&x3);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x3 = (int *)alloca((size_t)datasize);
+    memset((void *)x3, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x3, _cffi_type(2), arg3) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(2), arg4, (char **)&x4);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x4 = (int *)alloca((size_t)datasize);
+    memset((void *)x4, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x4, _cffi_type(2), arg4) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(2), arg5, (char **)&x5);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x5 = (int *)alloca((size_t)datasize);
+    memset((void *)x5, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x5, _cffi_type(2), arg5) < 0)
+      return NULL;
+  }
+
+  x6 = _cffi_to_c_int(arg6, int);
+  if (x6 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x7 = _cffi_to_c_int(arg7, int);
+  if (x7 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x8 = _cffi_to_c_int(arg8, int);
+  if (x8 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { compress_trans(x0, x1, x2, x3, x4, x5, x6, x7, x8); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+#else
+#  define _cffi_f_compress_trans _cffi_d_compress_trans
 #endif
 
 static void _cffi_d_createIndexation(char * x0, int * x1, int * x2, int x3)
@@ -1182,10 +1436,11 @@ _cffi_f_tData_simple(PyObject *self, PyObject *args)
 
 static const struct _cffi_global_s _cffi_globals[] = {
   { "calculate_j", (void *)_cffi_f_calculate_j, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 0), (void *)_cffi_d_calculate_j },
-  { "createIndexation", (void *)_cffi_f_createIndexation, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 34), (void *)_cffi_d_createIndexation },
-  { "padData", (void *)_cffi_f_padData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 17), (void *)_cffi_d_padData },
-  { "tData", (void *)_cffi_f_tData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 6), (void *)_cffi_d_tData },
-  { "tData_simple", (void *)_cffi_f_tData_simple, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 25), (void *)_cffi_d_tData_simple },
+  { "compress_trans", (void *)_cffi_f_compress_trans, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 6), (void *)_cffi_d_compress_trans },
+  { "createIndexation", (void *)_cffi_f_createIndexation, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 45), (void *)_cffi_d_createIndexation },
+  { "padData", (void *)_cffi_f_padData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 28), (void *)_cffi_d_padData },
+  { "tData", (void *)_cffi_f_tData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 17), (void *)_cffi_d_tData },
+  { "tData_simple", (void *)_cffi_f_tData_simple, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 36), (void *)_cffi_d_tData_simple },
 };
 
 static const struct _cffi_type_context_s _cffi_type_context = {
@@ -1195,12 +1450,12 @@ static const struct _cffi_type_context_s _cffi_type_context = {
   NULL,  /* no struct_unions */
   NULL,  /* no enums */
   NULL,  /* no typenames */
-  5,  /* num_globals */
+  6,  /* num_globals */
   0,  /* num_struct_unions */
   0,  /* num_enums */
   0,  /* num_typenames */
   NULL,  /* no includes */
-  42,  /* num_types */
+  53,  /* num_types */
   0,  /* flags */
 };
 

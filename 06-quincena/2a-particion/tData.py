@@ -109,6 +109,7 @@ ffibuilder.set_source("tData",
 '''
 #include <stdio.h>
 #include <stdint.h>
+#include <blosc.h>
 
 
 int calculate_j(int k, int dim[], int shp[], int sub[]) {
@@ -133,8 +134,6 @@ int calculate_j(int k, int dim[], int shp[], int sub[]) {
 }
 
 void createIndexation(char* keys, int shape[], int sub_shape[], int dimension){
-
-    // printf("Hola");
 
     int MAX_DIM = 8;
     int DIM = dimension;
@@ -181,8 +180,6 @@ void createIndexation(char* keys, int shape[], int sub_shape[], int dimension){
                                              + f/sb[5]*sd[6]*sd[7]
                                              + g/sb[6]*sd[7]
                                              + h/sb[7];
-
-                                     printf("%llu - %llu", k, cont);
 
                                      memcpy(&keys[cont * 8], &k, 8);
                                      cont++;
@@ -300,8 +297,131 @@ void tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
     tData_simple(src_aux, dest, typesize, sub_shape, pad_shape, dimension, inverse);
 
 }
+
+void compress_trans(char* comp,char* dest, int trans_shape[], int part_shape[], int dimensions[],
+                    int sub_trans[], int dimension, int b_size, int typesize){
+
+    int MAX_DIM = 8;
+    int DIM = dimension;
+
+    int subpl[MAX_DIM], ts[MAX_DIM], ps[MAX_DIM], dim[MAX_DIM], sd[MAX_DIM];
+
+    for (int i = 0; i < MAX_DIM; i++) {
+        if (i < DIM) {
+            ts[MAX_DIM + i - DIM] = trans_shape[i];
+            ps[MAX_DIM + i - DIM] = part_shape[i];
+            dim[MAX_DIM + i - DIM] = dimensions[i];
+            subpl[MAX_DIM + i - DIM] = sub_trans[i];
+            sd[MAX_DIM + i - DIM] = trans_shape[i]/part_shape[i];
+
+        } else {
+            ts[MAX_DIM - i - 1] = 1;
+            ps[MAX_DIM - i - 1] = 1;
+            dim[MAX_DIM - i - 1] = -1;
+            sd[MAX_DIM - i - 1] = 1;
+            subpl[MAX_DIM - i - 1] = 1;
+
+        }
+
+    }
+
+    int oi_s[MAX_DIM], oi_f[MAX_DIM];
+
+
+    for (int i = 0; i < MAX_DIM; i++) {
+        if (dim[i] != -1) {
+            oi_s[i] = dim[i];
+            oi_f[i] = dim[i] + 1;
+        } else {
+            oi_s[i] = 0;
+            oi_f[i] = ts[i];
+        }
+    }
+
+    char *aux = malloc(b_size * typesize);
+
+    int k, n;
+
+    for (int a = oi_s[0]/ps[0]*ps[0]; a < oi_f[0]; a += ps[0]) {
+        for (int b = oi_s[1]/ps[1]*ps[1]; b < oi_f[1]; b += ps[1]) {
+            for (int c = oi_s[2]/ps[2]*ps[2]; c < oi_f[2]; c += ps[2]) {
+                for (int d = oi_s[3]/ps[3]*ps[3]; d < oi_f[3]; d += ps[3]) {
+                    for (int e = oi_s[4]/ps[4]*ps[4]; e < oi_f[4]; e += ps[4]) {
+                        for (int f = oi_s[5]/ps[5]*ps[5]; f < oi_f[5]; f += ps[5]) {
+                            for (int g = oi_s[6]/ps[6]*ps[6]; g < oi_f[6]; g += ps[6]) {
+                                for (int h = oi_s[7]/ps[7]*ps[7]; h < oi_f[7]; h += ps[7]) {
+
+                                    k = h
+                                         + g*ts[7]
+                                         + f*ts[7]*ts[6]
+                                         + e*ts[7]*ts[6]*ts[5]
+                                         + d*ts[7]*ts[6]*ts[5]*ts[4]
+                                         + c*ts[7]*ts[6]*ts[5]*ts[4]*ts[3]
+                                         + b*ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]
+                                         + a*ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]*ts[1];
+
+                                     n = a/ps[0]*sd[1]*sd[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
+                                        + b/ps[1]*sd[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
+                                        + c/ps[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
+                                        + d/ps[3]*sd[4]*sd[5]*sd[6]*sd[7]
+                                        + e/ps[4]*sd[5]*sd[6]*sd[7]
+                                        + f/ps[5]*sd[6]*sd[7]
+                                        + g/ps[6]*sd[7]
+                                        + h/ps[7];
+
+                                    blosc_getitem(comp, n * b_size, b_size, aux);
+
+                                    int h2 = k % ts[7] % subpl[7];
+                                    int g2 = k / (ts[7]) % subpl[6];
+                                    int f2 = k / (ts[7]*ts[6]) % subpl[5];
+                                    int e2 = k / (ts[7]*ts[6]*ts[5]) % subpl[4];
+                                    int d2 = k / (ts[7]*ts[6]*ts[5]*ts[4]) % subpl[3];
+                                    int c2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]) % subpl[2];
+                                    int b2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]) % subpl[1];
+                                    int a2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]*ts[1]) % subpl[0];
+
+                                    int cont = 0;
+
+                                    for (int ra = a2; ra < a2 + ps[0]; ra++) {
+                                        for (int rb = b2; rb < b2 + ps[1]; rb++) {
+                                            for (int rc = c2; rc < c2 + ps[2]; rc++) {
+                                                for (int rd = d2; rd < d2 + ps[3]; rd++) {
+                                                    for (int re = e2; re < e2 + ps[4]; re++) {
+                                                        for (int rf = f2; rf < f2 + ps[5]; rf++) {
+                                                            for (int rg = g2; rg < g2 + ps[6]; rg++) {
+
+                                                                k = h2
+                                                                     + rg * subpl[7]
+                                                                     + rf * subpl[7]*subpl[6]
+                                                                     + re * subpl[7]*subpl[6]*subpl[5]
+                                                                     + rd * subpl[7]*subpl[6]*subpl[5]*subpl[4]
+                                                                     + rc * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]
+                                                                     + rb * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]
+                                                                     + ra * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1];
+
+                                                                memcpy(&dest[k * typesize], &aux[cont * typesize], ps[7] * typesize);
+                                                                cont += ps[7];
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+       }
+    }
+
+}
+
 ''',
-libraries=[])
+libraries=['blosc'])
 
 ffibuilder.cdef(
                 '''
@@ -319,6 +439,10 @@ ffibuilder.cdef(
                 void createIndexation(char* keys, int shape[], int sub_shape[],  int dimension);
 
                 int calculate_j(int k, int dim[], int shp[], int sub[]);
+
+                void compress_trans(char* comp, char* dest, int trans_shape[], int part_shape[],
+                                    int sub_trans[], int dimensions[], int dimension, int b_size,
+                                    int typesize);
 
                 '''
                 )

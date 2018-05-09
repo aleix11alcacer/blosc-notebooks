@@ -237,58 +237,62 @@ def get_block(comp, index, ps, dtype):
     return dest
 
 
-def decompress_trans(comp, indexation, dtype, s, ts, ps, a=-1, b=-1, c=-1, d=-1,
+def decompress_trans(comp, indexation, dtype, ts, ps, a=-1, b=-1, c=-1, d=-1,
                      e=-1, f=-1, g=-1, h=-1):
 
-    dimension = len(s)
-    dim = [a, b, c, d, e, f, g, h][:-dimension]
+    dimension = len(ps)
+    dim = [a, b, c, d, e, f, g, h][:dimension]
 
-    s_aux = [1, 1, 1, 1, 1, 1, 1, 1]
+    subpl = [1, 1, 1, 1, 1, 1, 1, 1]
+
+    for i in range(8):
+        if i < dimension:
+            if dim[i] != -1:
+                subpl[8 - dimension + i] = ps[i]
+            else:
+                subpl[8 - dimension + i] = ts[i]
+
+
     ts_aux = [1, 1, 1, 1, 1, 1, 1, 1]
     ps_aux = [1, 1, 1, 1, 1, 1, 1, 1]
     dim_aux = [-1, -1, -1, -1, -1, -1, -1, -1]
-    index_aux = [1, 1, 1, 1, 1, 1, 1, 1]
 
     for i in range(dimension):
-        s_aux[-dimension + i] = s[i]
         ts_aux[-dimension + i] = ts[i]
         ps_aux[-dimension + i] = ps[i]
-        dim_aux[-dimension - i] = dim[i]
+        dim_aux[-dimension + i] = dim[i]
     ts = ts_aux
     ps = ps_aux
-    s = s_aux
     dim = dim_aux
 
-    ul = np.copy(ts)
     ui = [(0, ts[0]), (0, ts[1]), (0, ts[2]), (0, ts[3]), (0, ts[4]), (0, ts[5]), (0, ts[6]),
           (0, ts[7])]
 
-    for i in range(len(index_aux)):
+    for i in range(len(ts)):
         if dim[i] != -1:
-            ul[i] = ps[i]
             ui[i] = (dim[i], dim[i]+1)
-            index_aux[i] = 0
-
-    subpl = ul
 
     ind = obtainIndex(ui, indexation, ts, ps)
 
-    print(np.prod(subpl))
-
     dest = np.zeros(np.prod(subpl), dtype=dtype)
 
+    co = 0
     for i, (k, n) in enumerate(ind):
 
         aux = get_block(comp, n, ps, dtype)
 
-        h = k % subpl[7]
-        g = k // (subpl[7]) % subpl[6]
-        f = k // (subpl[7]*subpl[6]) % subpl[5]
-        e = k // (subpl[7]*subpl[6]*subpl[5]) % subpl[4]
-        d = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]) % subpl[3]
-        c = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]) % subpl[2]
-        b = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]) % subpl[1]
-        a = k // (subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1]) % subpl[0]
+        h = k % ts[7] % subpl[7]
+        g = k // (ts[7]) % subpl[6]
+        f = k // (ts[7]*ts[6]) % subpl[5]
+        e = k // (ts[7]*ts[6]*ts[5]) % subpl[4]
+        d = k // (ts[7]*ts[6]*ts[5]*ts[4]) % subpl[3]
+        c = k // (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]) % subpl[2]
+        b = k // (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]) % subpl[1]
+        a = k // (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]*ts[1]) % subpl[0]
+
+        co += np.prod(subpl)//subpl[7]
+
+        # print(a, b, c, d, e, f, g, h)
 
         cont = 0
 
@@ -300,16 +304,40 @@ def decompress_trans(comp, indexation, dtype, s, ts, ps, a=-1, b=-1, c=-1, d=-1,
                             for rf in range(f, f + ps[5]):
                                 for rg in range(g, g + ps[6]):
 
-                                    n = (h
-                                         + rg*subpl[7]
-                                         + rf*subpl[7]*subpl[6]
-                                         + re*subpl[7]*subpl[6]*subpl[5]
-                                         + rd*subpl[7]*subpl[6]*subpl[5]*subpl[4]
-                                         + rc*subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]
-                                         + rb*subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]
-                                         + ra*subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1]) // ps[7]
+                                    k = (h
+                                         + rg * subpl[7]
+                                         + rf * subpl[7] * subpl[6]
+                                         + re * subpl[7]*subpl[6]*subpl[5]
+                                         + rd * subpl[7]*subpl[6]*subpl[5]*subpl[4]
+                                         + rc * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]
+                                         + rb * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]
+                                         + ra * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1])
 
-                                    dest[n % np.prod(subpl) * ps[7]: (n % np.prod(subpl)+1) * ps[7]] = aux[cont * ps[7]: (cont+1) * ps[7]]
+                                    dest[k: k + ps[7]] = aux[cont * ps[7]: (cont+1) * ps[7]]
                                     cont += 1
 
     return dest.reshape(subpl[-dimension:])
+
+
+def test_compress(comp, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, h=-1):
+    dimension = len(ps)
+    dim = [a, b, c, d, e, f, g, h][:dimension]
+    b_size = np.prod(ps)
+
+    subpl = [1] * dimension
+
+    for i in range(dimension):
+        if i < dimension:
+            if dim[i] != -1:
+                subpl[i] = ps[i]
+            else:
+                subpl[i] = ts[i]
+
+    dest = np.empty(np.prod(subpl), dtype=np.int32).reshape(subpl)
+
+    dest_b = ffi.from_buffer(dest)
+    comp_b = ffi.from_buffer(comp)
+
+    lib.compress_trans(comp_b, dest_b, ts, ps,  dim, subpl, dimension, b_size, dest.dtype.itemsize)
+
+    return dest
