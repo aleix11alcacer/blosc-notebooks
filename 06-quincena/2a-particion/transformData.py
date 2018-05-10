@@ -28,7 +28,7 @@ def tData(src, ps, inverse=False):
     """
 
     # Obtain src parameters
-    print("empieza aquí")
+
     typesize = src.dtype.itemsize
     shape = src.shape
     dimension = len(shape)
@@ -60,87 +60,7 @@ def tData(src, ps, inverse=False):
 
     lib.tData(src_b, dest_b, typesize, shape, ts, ps, size, dimension, inv)
 
-    d = createIndexation(ts, ps)
-
-    return dest, d
-
-
-def createIndexation(shape, ps):
-    """
-    Create an indexation of data partitions.
-
-    Parameters
-    ----------
-    shape : int[] or tuple
-        Data shape.
-    ps: int[] or tuple
-        Data partition shape.
-
-    Returns
-    -------
-    indexation: dict
-        Dictianary containing the indexation.
-        key: partition number
-        value: schunk number to decompress
-    """
-
-    dimension = len(shape)
-
-    # Calculate the partitions the size
-
-    size = int(np.prod(shape)/np.prod(ps))
-
-    keys = np.zeros(size, dtype=np.int64)
-
-    k_b = ffi.from_buffer(keys)
-
-    # Create the indexation
-
-    lib.createIndexation(k_b, shape, ps, dimension)
-
-    # Create a dicttionary with keys and values
-
-    d = dict([(k, v) for v, k in enumerate(keys)])
-
-    return d
-
-
-def obtainIndex(dim, dic, s, ps):
-
-    dimension = len(s)
-
-    s_aux = [1, 1, 1, 1, 1, 1, 1, 1]
-    ps_aux = [1, 1, 1, 1, 1, 1, 1, 1]
-
-    for i in range(dimension):
-        s_aux[-dimension + i] = s[i]
-        ps_aux[-dimension + i] = ps[i]
-
-    ps = ps_aux
-    s = s_aux
-
-    ind = []
-
-    for a in range(dim[0][0]//ps[0]*ps[0], dim[0][1], ps[0]):
-        for b in range(dim[1][0]//ps[1]*ps[1], dim[1][1], ps[1]):
-            for c in range(dim[2][0]//ps[2]*ps[2], dim[2][1], ps[2]):
-                for d in range(dim[3][0]//ps[3]*ps[3], dim[3][1], ps[3]):
-                    for e in range(dim[4][0]//ps[4]*ps[4], dim[4][1], ps[4]):
-                        for f in range(dim[5][0]//ps[5]*ps[5], dim[5][1], ps[5]):
-                            for g in range(dim[6][0]//ps[6]*ps[6], dim[6][1], ps[6]):
-                                for h in range(dim[7][0]//ps[7]*ps[7], dim[7][1], ps[7]):
-
-                                    k = (h
-                                         + g*s[7]
-                                         + f*s[7]*s[6]
-                                         + e*s[7]*s[6]*s[5]
-                                         + d*s[7]*s[6]*s[5]*s[4]
-                                         + c*s[7]*s[6]*s[5]*s[4]*s[3]
-                                         + b*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]
-                                         + a*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]*s[1])
-
-                                    ind.append((k, dic[k]))
-    return ind
+    return dest
 
 
 # Compression/decompression functions
@@ -207,122 +127,32 @@ def decompress(comp, s, itemsize, dtype):
     return dest
 
 
-def get_block(comp, index, ps, dtype):
+def decompress_trans(comp, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, h=-1):
     """
-    Extract a block of compressed data.
+    Decompress partitioned data.
 
     Parameters
     ----------
     comp : chunk
         Data compressed.
-    index: int
-        Number of block to decompress.
+    ts: int[] or tuple
+        Partitioned data shape.
     ps: int[] or tuple
         Data partition shape.
-    dtype: np.type
-        Data type.
+    a, b, c, d, e, f, g, h: int, optional
+        Defines the subset of data desired
 
     Returns
     -------
     dest : np.array
-        Data compressed.
+     Data decompressed.
     """
 
-    size = np.prod(ps)
-
-    dest = np.empty(size, dtype=dtype)
-
-    size_d = cb2.blosc_getitem(comp, index * size, size, dest)
-
-    return dest
-
-
-def decompress_trans(comp, indexation, dtype, ts, ps, a=-1, b=-1, c=-1, d=-1,
-                     e=-1, f=-1, g=-1, h=-1):
-
-    dimension = len(ps)
-    dim = [a, b, c, d, e, f, g, h][:dimension]
-
-    subpl = [1, 1, 1, 1, 1, 1, 1, 1]
-
-    for i in range(8):
-        if i < dimension:
-            if dim[i] != -1:
-                subpl[8 - dimension + i] = ps[i]
-            else:
-                subpl[8 - dimension + i] = ts[i]
-
-
-    ts_aux = [1, 1, 1, 1, 1, 1, 1, 1]
-    ps_aux = [1, 1, 1, 1, 1, 1, 1, 1]
-    dim_aux = [-1, -1, -1, -1, -1, -1, -1, -1]
-
-    for i in range(dimension):
-        ts_aux[-dimension + i] = ts[i]
-        ps_aux[-dimension + i] = ps[i]
-        dim_aux[-dimension + i] = dim[i]
-    ts = ts_aux
-    ps = ps_aux
-    dim = dim_aux
-
-    ui = [(0, ts[0]), (0, ts[1]), (0, ts[2]), (0, ts[3]), (0, ts[4]), (0, ts[5]), (0, ts[6]),
-          (0, ts[7])]
-
-    for i in range(len(ts)):
-        if dim[i] != -1:
-            ui[i] = (dim[i], dim[i]+1)
-
-    ind = obtainIndex(ui, indexation, ts, ps)
-
-    dest = np.zeros(np.prod(subpl), dtype=dtype)
-
-    co = 0
-    for i, (k, n) in enumerate(ind):
-
-        aux = get_block(comp, n, ps, dtype)
-
-        h = k % ts[7] % subpl[7]
-        g = k // (ts[7]) % subpl[6]
-        f = k // (ts[7]*ts[6]) % subpl[5]
-        e = k // (ts[7]*ts[6]*ts[5]) % subpl[4]
-        d = k // (ts[7]*ts[6]*ts[5]*ts[4]) % subpl[3]
-        c = k // (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]) % subpl[2]
-        b = k // (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]) % subpl[1]
-        a = k // (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]*ts[1]) % subpl[0]
-
-        co += np.prod(subpl)//subpl[7]
-
-        # print(a, b, c, d, e, f, g, h)
-
-        cont = 0
-
-        for ra in range(a, a + ps[0]):
-            for rb in range(b, b + ps[1]):
-                for rc in range(c, c + ps[2]):
-                    for rd in range(d, d + ps[3]):
-                        for re in range(e, e + ps[4]):
-                            for rf in range(f, f + ps[5]):
-                                for rg in range(g, g + ps[6]):
-
-                                    k = (h
-                                         + rg * subpl[7]
-                                         + rf * subpl[7] * subpl[6]
-                                         + re * subpl[7]*subpl[6]*subpl[5]
-                                         + rd * subpl[7]*subpl[6]*subpl[5]*subpl[4]
-                                         + rc * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]
-                                         + rb * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]
-                                         + ra * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1])
-
-                                    dest[k: k + ps[7]] = aux[cont * ps[7]: (cont+1) * ps[7]]
-                                    cont += 1
-
-    return dest.reshape(subpl[-dimension:])
-
-
-def test_compress(comp, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, h=-1):
     dimension = len(ps)
     dim = [a, b, c, d, e, f, g, h][:dimension]
     b_size = np.prod(ps)
+
+    # Calculate desired data shape
 
     subpl = [1] * dimension
 
@@ -338,6 +168,6 @@ def test_compress(comp, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, h=-1):
     dest_b = ffi.from_buffer(dest)
     comp_b = ffi.from_buffer(comp)
 
-    lib.compress_trans(comp_b, dest_b, ts, ps,  dim, subpl, dimension, b_size, dest.dtype.itemsize)
+    lib.decompress_trans(comp_b, dest_b, ts, ps,  dim, subpl, dimension, b_size, dest.dtype.itemsize)
 
     return dest

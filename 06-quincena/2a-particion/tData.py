@@ -1,5 +1,5 @@
 '''
-Creates CFFI library to implement a data transformation algorithm.
+Creates CFFI library to implement data transformation and compression algorithms.
 
 
 calculate_j(k, dim, shp, sub)
@@ -83,22 +83,31 @@ padData(src, dest, typesize, shape, pad_shape, dimension)
             Data dimension.
 
 
-createIndexation(keys, shape, sub_shape, dimension)
+decompress_trans(comp, dest, trans_shape, part_shape, dimensions, sub_trans, dimension, b_size,
+               typesize)
 
-    Create a list of values where every value represents a partition and every position represents
-     the schunk number. The typesize of keys must be 8.
+    Decompress partitioned data decompressing only the desired data.
 
     Parameters
     ----------
-        keys: char*
-            Location of list to fill with values.
-        shape: int[]
-            Original or expanded data shape.
-        sub_shape: int[]
-            Data partition shape.
+        comp: char*
+            Location of compressed data pointer.
+        dest: char*
+            Location of data transformed pointer.
+        trans_shape: int[]
+            Partitioned data shape.
+        part_shape: int[]
+            A data partition shape.
+        dimensions: int[]
+            Defines data desired subset.
+        sub_trans: int[]
+            Desired data shape.
         dimension: int
             Data dimension.
-
+        b_size: int
+            Data partition size.
+        typesize: int
+            Data element size.
 '''
 
 
@@ -110,7 +119,6 @@ ffibuilder.set_source("tData",
 #include <stdio.h>
 #include <stdint.h>
 #include <blosc.h>
-
 
 int calculate_j(int k, int dim[], int shp[], int sub[]) {
 
@@ -131,66 +139,6 @@ int calculate_j(int k, int dim[], int shp[], int sub[]) {
         dim[7]*(k/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6])%sub[7]*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6] + k/(shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*sub[7])%(shp[7]/sub[7])*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*sub[7]);
 
         return j;
-}
-
-void createIndexation(char* keys, int shape[], int sub_shape[], int dimension){
-
-    int MAX_DIM = 8;
-    int DIM = dimension;
-
-    int s[MAX_DIM], sb[MAX_DIM], sd[MAX_DIM];
-
-    for (int i = 0; i < MAX_DIM; i++) {
-        if (i < DIM) {
-            s[MAX_DIM + i - DIM] = shape[i];
-            sb[MAX_DIM + i - DIM] = sub_shape[i];
-            sd[MAX_DIM + i - DIM] = shape[i]/sub_shape[i];
-
-        } else {
-            s[MAX_DIM - i - 1] = 1;
-            sb[MAX_DIM - i - 1] = 1;
-            sd[MAX_DIM -i - 1] = 1;
-        }
-    }
-
-
-     for (int a=0; a < s[0]; a += sb[0]){
-         for (int b=0; b < s[1]; b += sb[1]){
-             for (int c=0; c < s[2]; c += sb[2]){
-                 for (int d=0; d < s[3]; d += sb[3]){
-                     for (int e=0; e < s[4]; e += sb[4]){
-                         for (int f=0; f < s[5]; f += sb[5]){
-                             for (int g=0; g < s[6]; g += sb[6]){
-                                 for (int h=0; h < s[7]; h += sb[7]){
-
-                                      uint64_t k = h
-                                           + g*s[7]
-                                           + f*s[7]*s[6]
-                                           + e*s[7]*s[6]*s[5]
-                                           + d*s[7]*s[6]*s[5]*s[4]
-                                           + c*s[7]*s[6]*s[5]*s[4]*s[3]
-                                           + b*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]
-                                           + a*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]*s[1];
-
-                                      uint64_t cont = a/sb[0]*sd[1]*sd[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
-                                             + b/sb[1]*sd[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
-                                             + c/sb[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
-                                             + d/sb[3]*sd[4]*sd[5]*sd[6]*sd[7]
-                                             + e/sb[4]*sd[5]*sd[6]*sd[7]
-                                             + f/sb[5]*sd[6]*sd[7]
-                                             + g/sb[6]*sd[7]
-                                             + h/sb[7];
-
-                                     memcpy(&keys[cont * 8], &k, 8);
-                                     cont++;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 void padData(char* src, char* dest, int typesize, int shape[], int pad_shape[], int dimension) {
@@ -298,7 +246,7 @@ void tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
 
 }
 
-void compress_trans(char* comp,char* dest, int trans_shape[], int part_shape[], int dimensions[],
+void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[], int dimensions[],
                     int sub_trans[], int dimension, int b_size, int typesize){
 
     int MAX_DIM = 8;
@@ -420,8 +368,7 @@ void compress_trans(char* comp,char* dest, int trans_shape[], int part_shape[], 
 
 }
 
-''',
-libraries=['blosc'])
+''', libraries=['blosc'])
 
 ffibuilder.cdef(
                 '''
@@ -436,11 +383,9 @@ ffibuilder.cdef(
                              int dimension);
 
 
-                void createIndexation(char* keys, int shape[], int sub_shape[],  int dimension);
-
                 int calculate_j(int k, int dim[], int shp[], int sub[]);
 
-                void compress_trans(char* comp, char* dest, int trans_shape[], int part_shape[],
+                void decompress_trans(char* comp, char* dest, int trans_shape[], int part_shape[],
                                     int sub_trans[], int dimensions[], int dimension, int b_size,
                                     int typesize);
 

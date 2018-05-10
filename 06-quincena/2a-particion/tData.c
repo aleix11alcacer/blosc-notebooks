@@ -494,7 +494,6 @@ static void (*_cffi_call_python_org)(struct _cffi_externpy_s *, char *);
 #include <stdint.h>
 #include <blosc.h>
 
-
 int calculate_j(int k, int dim[], int shp[], int sub[]) {
 
     int j = dim[0]*((k)%sub[0] + k/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6]*sub[7])%(shp[0]/sub[0])*sub[0])
@@ -514,66 +513,6 @@ int calculate_j(int k, int dim[], int shp[], int sub[]) {
         dim[7]*(k/(sub[0]*sub[1]*sub[2]*sub[3]*sub[4]*sub[5]*sub[6])%sub[7]*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6] + k/(shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*sub[7])%(shp[7]/sub[7])*shp[0]*shp[1]*shp[2]*shp[3]*shp[4]*shp[5]*shp[6]*sub[7]);
 
         return j;
-}
-
-void createIndexation(char* keys, int shape[], int sub_shape[], int dimension){
-
-    int MAX_DIM = 8;
-    int DIM = dimension;
-
-    int s[MAX_DIM], sb[MAX_DIM], sd[MAX_DIM];
-
-    for (int i = 0; i < MAX_DIM; i++) {
-        if (i < DIM) {
-            s[MAX_DIM + i - DIM] = shape[i];
-            sb[MAX_DIM + i - DIM] = sub_shape[i];
-            sd[MAX_DIM + i - DIM] = shape[i]/sub_shape[i];
-
-        } else {
-            s[MAX_DIM - i - 1] = 1;
-            sb[MAX_DIM - i - 1] = 1;
-            sd[MAX_DIM -i - 1] = 1;
-        }
-    }
-
-
-     for (int a=0; a < s[0]; a += sb[0]){
-         for (int b=0; b < s[1]; b += sb[1]){
-             for (int c=0; c < s[2]; c += sb[2]){
-                 for (int d=0; d < s[3]; d += sb[3]){
-                     for (int e=0; e < s[4]; e += sb[4]){
-                         for (int f=0; f < s[5]; f += sb[5]){
-                             for (int g=0; g < s[6]; g += sb[6]){
-                                 for (int h=0; h < s[7]; h += sb[7]){
-
-                                      uint64_t k = h
-                                           + g*s[7]
-                                           + f*s[7]*s[6]
-                                           + e*s[7]*s[6]*s[5]
-                                           + d*s[7]*s[6]*s[5]*s[4]
-                                           + c*s[7]*s[6]*s[5]*s[4]*s[3]
-                                           + b*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]
-                                           + a*s[7]*s[6]*s[5]*s[4]*s[3]*s[2]*s[1];
-
-                                      uint64_t cont = a/sb[0]*sd[1]*sd[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
-                                             + b/sb[1]*sd[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
-                                             + c/sb[2]*sd[3]*sd[4]*sd[5]*sd[6]*sd[7]
-                                             + d/sb[3]*sd[4]*sd[5]*sd[6]*sd[7]
-                                             + e/sb[4]*sd[5]*sd[6]*sd[7]
-                                             + f/sb[5]*sd[6]*sd[7]
-                                             + g/sb[6]*sd[7]
-                                             + h/sb[7];
-
-                                     memcpy(&keys[cont * 8], &k, 8);
-                                     cont++;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 void padData(char* src, char* dest, int typesize, int shape[], int pad_shape[], int dimension) {
@@ -681,7 +620,7 @@ void tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
 
 }
 
-void compress_trans(char* comp,char* dest, int trans_shape[], int part_shape[], int dimensions[],
+void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[], int dimensions[],
                     int sub_trans[], int dimension, int b_size, int typesize){
 
     int MAX_DIM = 8;
@@ -814,8 +753,8 @@ static void *_cffi_types[] = {
 /*  3 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /*  4 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /*  5 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION, 52), // void()(char *, char *, int *, int *, int *, int *, int, int, int)
-/*  7 */ _CFFI_OP(_CFFI_OP_POINTER, 51), // char *
+/*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION, 46), // void()(char *, char *, int *, int *, int *, int *, int, int, int)
+/*  7 */ _CFFI_OP(_CFFI_OP_POINTER, 45), // char *
 /*  8 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /*  9 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /* 10 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
@@ -825,7 +764,7 @@ static void *_cffi_types[] = {
 /* 14 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 15 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 16 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 17 */ _CFFI_OP(_CFFI_OP_FUNCTION, 52), // void()(char *, char *, int, int *, int *, int *, int, int, int)
+/* 17 */ _CFFI_OP(_CFFI_OP_FUNCTION, 46), // void()(char *, char *, int, int *, int *, int *, int, int, int)
 /* 18 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 19 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 20 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -836,7 +775,7 @@ static void *_cffi_types[] = {
 /* 25 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 26 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 27 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 28 */ _CFFI_OP(_CFFI_OP_FUNCTION, 52), // void()(char *, char *, int, int *, int *, int)
+/* 28 */ _CFFI_OP(_CFFI_OP_FUNCTION, 46), // void()(char *, char *, int, int *, int *, int)
 /* 29 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 30 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 31 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -844,7 +783,7 @@ static void *_cffi_types[] = {
 /* 33 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /* 34 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 35 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 36 */ _CFFI_OP(_CFFI_OP_FUNCTION, 52), // void()(char *, char *, int, int *, int *, int, int)
+/* 36 */ _CFFI_OP(_CFFI_OP_FUNCTION, 46), // void()(char *, char *, int, int *, int *, int, int)
 /* 37 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 38 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 39 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
@@ -853,14 +792,8 @@ static void *_cffi_types[] = {
 /* 42 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 43 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 44 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 45 */ _CFFI_OP(_CFFI_OP_FUNCTION, 52), // void()(char *, int *, int *, int)
-/* 46 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 47 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 48 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 49 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 50 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 51 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
-/* 52 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
+/* 45 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
+/* 46 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
 };
 
 static int _cffi_d_calculate_j(int x0, int * x1, int * x2, int * x3)
@@ -935,13 +868,13 @@ _cffi_f_calculate_j(PyObject *self, PyObject *args)
 #  define _cffi_f_calculate_j _cffi_d_calculate_j
 #endif
 
-static void _cffi_d_compress_trans(char * x0, char * x1, int * x2, int * x3, int * x4, int * x5, int x6, int x7, int x8)
+static void _cffi_d_decompress_trans(char * x0, char * x1, int * x2, int * x3, int * x4, int * x5, int x6, int x7, int x8)
 {
-  compress_trans(x0, x1, x2, x3, x4, x5, x6, x7, x8);
+  decompress_trans(x0, x1, x2, x3, x4, x5, x6, x7, x8);
 }
 #ifndef PYPY_VERSION
 static PyObject *
-_cffi_f_compress_trans(PyObject *self, PyObject *args)
+_cffi_f_decompress_trans(PyObject *self, PyObject *args)
 {
   char * x0;
   char * x1;
@@ -963,7 +896,7 @@ _cffi_f_compress_trans(PyObject *self, PyObject *args)
   PyObject *arg7;
   PyObject *arg8;
 
-  if (!PyArg_UnpackTuple(args, "compress_trans", 9, 9, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8))
+  if (!PyArg_UnpackTuple(args, "decompress_trans", 9, 9, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8))
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
@@ -1046,7 +979,7 @@ _cffi_f_compress_trans(PyObject *self, PyObject *args)
 
   Py_BEGIN_ALLOW_THREADS
   _cffi_restore_errno();
-  { compress_trans(x0, x1, x2, x3, x4, x5, x6, x7, x8); }
+  { decompress_trans(x0, x1, x2, x3, x4, x5, x6, x7, x8); }
   _cffi_save_errno();
   Py_END_ALLOW_THREADS
 
@@ -1055,79 +988,7 @@ _cffi_f_compress_trans(PyObject *self, PyObject *args)
   return Py_None;
 }
 #else
-#  define _cffi_f_compress_trans _cffi_d_compress_trans
-#endif
-
-static void _cffi_d_createIndexation(char * x0, int * x1, int * x2, int x3)
-{
-  createIndexation(x0, x1, x2, x3);
-}
-#ifndef PYPY_VERSION
-static PyObject *
-_cffi_f_createIndexation(PyObject *self, PyObject *args)
-{
-  char * x0;
-  int * x1;
-  int * x2;
-  int x3;
-  Py_ssize_t datasize;
-  PyObject *arg0;
-  PyObject *arg1;
-  PyObject *arg2;
-  PyObject *arg3;
-
-  if (!PyArg_UnpackTuple(args, "createIndexation", 4, 4, &arg0, &arg1, &arg2, &arg3))
-    return NULL;
-
-  datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(7), arg0, (char **)&x0);
-  if (datasize != 0) {
-    if (datasize < 0)
-      return NULL;
-    x0 = (char *)alloca((size_t)datasize);
-    memset((void *)x0, 0, (size_t)datasize);
-    if (_cffi_convert_array_from_object((char *)x0, _cffi_type(7), arg0) < 0)
-      return NULL;
-  }
-
-  datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(2), arg1, (char **)&x1);
-  if (datasize != 0) {
-    if (datasize < 0)
-      return NULL;
-    x1 = (int *)alloca((size_t)datasize);
-    memset((void *)x1, 0, (size_t)datasize);
-    if (_cffi_convert_array_from_object((char *)x1, _cffi_type(2), arg1) < 0)
-      return NULL;
-  }
-
-  datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(2), arg2, (char **)&x2);
-  if (datasize != 0) {
-    if (datasize < 0)
-      return NULL;
-    x2 = (int *)alloca((size_t)datasize);
-    memset((void *)x2, 0, (size_t)datasize);
-    if (_cffi_convert_array_from_object((char *)x2, _cffi_type(2), arg2) < 0)
-      return NULL;
-  }
-
-  x3 = _cffi_to_c_int(arg3, int);
-  if (x3 == (int)-1 && PyErr_Occurred())
-    return NULL;
-
-  Py_BEGIN_ALLOW_THREADS
-  _cffi_restore_errno();
-  { createIndexation(x0, x1, x2, x3); }
-  _cffi_save_errno();
-  Py_END_ALLOW_THREADS
-
-  (void)self; /* unused */
-  Py_INCREF(Py_None);
-  return Py_None;
-}
-#else
-#  define _cffi_f_createIndexation _cffi_d_createIndexation
+#  define _cffi_f_decompress_trans _cffi_d_decompress_trans
 #endif
 
 static void _cffi_d_padData(char * x0, char * x1, int x2, int * x3, int * x4, int x5)
@@ -1436,8 +1297,7 @@ _cffi_f_tData_simple(PyObject *self, PyObject *args)
 
 static const struct _cffi_global_s _cffi_globals[] = {
   { "calculate_j", (void *)_cffi_f_calculate_j, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 0), (void *)_cffi_d_calculate_j },
-  { "compress_trans", (void *)_cffi_f_compress_trans, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 6), (void *)_cffi_d_compress_trans },
-  { "createIndexation", (void *)_cffi_f_createIndexation, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 45), (void *)_cffi_d_createIndexation },
+  { "decompress_trans", (void *)_cffi_f_decompress_trans, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 6), (void *)_cffi_d_decompress_trans },
   { "padData", (void *)_cffi_f_padData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 28), (void *)_cffi_d_padData },
   { "tData", (void *)_cffi_f_tData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 17), (void *)_cffi_d_tData },
   { "tData_simple", (void *)_cffi_f_tData_simple, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 36), (void *)_cffi_d_tData_simple },
@@ -1450,12 +1310,12 @@ static const struct _cffi_type_context_s _cffi_type_context = {
   NULL,  /* no struct_unions */
   NULL,  /* no enums */
   NULL,  /* no typenames */
-  6,  /* num_globals */
+  5,  /* num_globals */
   0,  /* num_struct_unions */
   0,  /* num_enums */
   0,  /* num_typenames */
   NULL,  /* no includes */
-  53,  /* num_types */
+  47,  /* num_types */
   0,  /* flags */
 };
 
