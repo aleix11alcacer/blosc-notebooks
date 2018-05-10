@@ -18,8 +18,9 @@ calculate_j(k, dim, shp, sub)
         j: int
 
 
-tData(src, dest, typesize, sub_shape, shape, dimension, inverse)
-    Choose if the algorithm needed is general or simple.
+tData(src, dest, typesize, shape, pad_shape, sub_shape, size, dimension, inverse)
+
+    Resize data of needed dimensions and transform it.
 
     Parameters
     ----------
@@ -29,16 +30,19 @@ tData(src, dest, typesize, sub_shape, shape, dimension, inverse)
             Location of data transformed pointer.
         typesize: int
             Data element size.
-        sub_shape: int[]
-            Data partition shape.
         shape: int[]
             Data shape.
+        pad_shape: int[]
+            Data transformed shape.
+        sub_shape: int[]
+            Data partition shape.
         dimension: int
             Data dimension.
         inverse: int
 
 
 tData_simple(src, dest, typesize, sub_shape, shape, dimension, inverse)
+
     Calculate the data transformation in case that the algorithm needed is simple.
 
     Parameters
@@ -56,6 +60,45 @@ tData_simple(src, dest, typesize, sub_shape, shape, dimension, inverse)
         dimension: int
             Data dimension.
         inverse: int
+
+
+padData(src, dest, typesize, shape, pad_shape, dimension)
+
+    Resize orignial data padding it with 0 to obtain expandend data  wich dimension is multiple
+        of partition dimension.
+
+    Parameters
+    ----------
+        src: char*
+            Location of data to transform pointer.
+        dest: char*
+            Location of data transformed pointer.
+        typesize: int
+            Data element size.
+        shape: int[]
+            Original data shape.
+        shape: int[]
+            Expanded data shape.
+        dimension: int
+            Data dimension.
+
+
+createIndexation(keys, shape, sub_shape, dimension)
+
+    Create a list of values where every value represents a partition and every position represents
+     the schunk number. The typesize of keys must be 8.
+
+    Parameters
+    ----------
+        keys: char*
+            Location of list to fill with values.
+        shape: int[]
+            Original or expanded data shape.
+        sub_shape: int[]
+            Data partition shape.
+        dimension: int
+            Data dimension.
+
 '''
 
 
@@ -232,7 +275,7 @@ void tData_simple(char* src, char* dest, int typesize, int sub_shape[], int shap
     }
 }
 
-int tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
+void tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
           int sub_shape[], int size, int dimension, int inverse) {
 
 
@@ -242,7 +285,6 @@ int tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
 
     tData_simple(src_aux, dest, typesize, sub_shape, pad_shape, dimension, inverse);
 
-    return 1;
 }
 ''',
 libraries=[])

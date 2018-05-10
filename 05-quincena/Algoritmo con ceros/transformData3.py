@@ -1,6 +1,6 @@
-'''
+"""
 Implements functions to use tData library.
-'''
+"""
 
 import numpy as np
 from tData import ffi, lib
@@ -23,6 +23,8 @@ def tData(src, sub_shp, inverse=False):
     -------
     dest: np.array
         Data transformed.
+    d: dict
+        Dictionary with partitions indexation.
     """
 
     # Obtain src parameters
@@ -45,16 +47,16 @@ def tData(src, sub_shp, inverse=False):
 
     # Create destination dataset
 
-    dest = np.zeros(size, dtype=src.dtype).reshape(pad_shp)
+    dest = np.empty(size, dtype=src.dtype).reshape(pad_shp)
 
     # Transform datasets to buffers (for use in cffi)
 
-    src2 = ffi.from_buffer(src)
-    dest2 = ffi.from_buffer(dest)
+    src_b = ffi.from_buffer(src)
+    dest_b = ffi.from_buffer(dest)
 
     # Execute the transformation
 
-    lib.tData(src2, dest2, typesize, shape, pad_shp, sub_shp, size, dimension, inverse)
+    lib.tData(src_b, dest_b, typesize, shape, pad_shp, sub_shp, size, dimension, inverse)
 
     d = createIndexation(pad_shp, sub_shp)
 
@@ -76,15 +78,15 @@ def create_shape(s):
     return s_aux
 
 
-def createIndexation(s, sb):
+def createIndexation(shape, sub_shp):
     """
-    Create an indexation of the data partitions of a dataset transformed.
+    Create an indexation of data partitions.
 
     Parameters
     ----------
-    s : int[] or tuple
+    shape : int[] or tuple
         Data shape.
-    sb: int[] or tuple
+    sub_shp: int[] or tuple
         Data partition shape.
 
     Returns
@@ -95,15 +97,21 @@ def createIndexation(s, sb):
         value: schunk number to decompress
     """
 
-    dimension = len(s)
+    dimension = len(shape)
 
-    size = int(np.prod(s)/np.prod(sb))
+    # Calculate the partitions the size
+
+    size = int(np.prod(shape)/np.prod(sub_shp))
 
     keys = np.zeros(size, dtype=np.int64)
 
-    k = ffi.from_buffer(keys)
+    k_b = ffi.from_buffer(keys)
 
-    lib.createIndexation(k, s, sb, dimension)
+    # Create the indexation
+
+    lib.createIndexation(k_b, shape, sub_shp, dimension)
+
+    # Create a dicttionary with keys and values
 
     d = dict([(k, v) for v, k in enumerate(keys)])
 
@@ -139,9 +147,8 @@ def obtainIndex(dim, dic, s, sb):
     return ind
 
 
-
-
 # Compression/decompression functions
+
 
 def compress(cparams, dparams, src):
 
@@ -176,21 +183,32 @@ def decompress(schunk, item_size, s, a=slice(0, None), b=slice(0, None), c=slice
 def compress_trans(cparams, dparams, srct, ts, sb):
 
     a_size = np.prod(sb)
+
     a_bsize = a_size * srct.dtype.itemsize
 
     schunk = cb2.blosc2_new_schunk(cparams, dparams)
 
     for i in range(np.prod([ts[j]//sb[j] for j in range(len(ts))])):
-        aux = srct[i * a_size:(i+1) * a_size]
+
+        aux = srct.flatten()[i * a_size:(i+1) * a_size]
+
         nchunks = cb2.blosc2_append_buffer(schunk, a_bsize, aux)
 
     return schunk
 
 
-def decompress_trans(schunk, indexation, item_size, s, ts, sb, a=None, b=None, c=None, d=None,
-                     e=None, f=None, g=None, h=None):
+def decompress_trans(schunk, indexation, item_size, s, ts, sb, a=-1, b=-1, c=-1, d=-1,
+                     e=-1, f=-1, g=-1, h=-1):
 
     dim = reorder_dim([a, b, c, d, e, f, g, h], len(s))
+
+    s_aux = [1, 1, 1, 1, 1, 1, 1, 1]
+    ts_aux = [1, 1, 1, 1, 1, 1, 1, 1]
+    sb_aux = [1, 1, 1, 1, 1, 1, 1, 1]
+    dim_aux = [-1, -1, -1, -1, -1, -1, -1, -1]
+    for i in range(len(s)):
+        s_aux[-len(s) + i] = s[i]
+    return s_aux
 
     s = create_shape(s)
     ts = create_shape(ts)
@@ -202,7 +220,7 @@ def decompress_trans(schunk, indexation, item_size, s, ts, sb, a=None, b=None, c
           (0, ts[7])]
 
     for i in range(len(index_aux)):
-        if dim[i] is not None:
+        if dim[i] is not -1:
             ul[i] = sb[i]
             ui[i] = (dim[i], dim[i]+1)
             index_aux[i] = 0
@@ -224,6 +242,7 @@ def decompress_trans(schunk, indexation, item_size, s, ts, sb, a=None, b=None, c
     for index, n in ind:
 
         index = [index[q]*index_aux[q] for q in range(len(dim))]
+
         cb2.blosc2_decompress_chunk(schunk, n, aux, AUX_bsize)
 
         dest[index[0]:index[0]+sb[0],
