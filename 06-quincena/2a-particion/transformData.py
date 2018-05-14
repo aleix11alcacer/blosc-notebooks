@@ -91,7 +91,7 @@ def compress(src, ps):
 
     cb2.blosc_set_blocksize(np.prod(ps) * itemsize)
 
-    size_c = cb2.blosc_compress(5, 1, itemsize, bsize, src, dest, bsize)
+    size_c = cb2.blosc_compress(9, 1, itemsize, bsize, src, dest, bsize)
 
     return dest
 
@@ -127,7 +127,7 @@ def decompress(comp, s, itemsize, dtype):
     return dest
 
 
-def decompress_trans(comp, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, h=-1):
+def decompress_trans(comp, s, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, h=-1):
     """
     Decompress partitioned data.
 
@@ -155,19 +155,24 @@ def decompress_trans(comp, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, h=-
     # Calculate desired data shape
 
     subpl = [1] * dimension
+    fs = [1] * dimension
 
     for i in range(dimension):
-        if i < dimension:
-            if dim[i] != -1:
-                subpl[i] = ps[i]
-            else:
-                subpl[i] = ts[i]
+        if dim[i] != -1:
+            subpl[i] = ps[i]
+            fs[i] = 1
+        else:
+            subpl[i] = ts[i]
+            fs[i] = s[i]
 
     dest = np.empty(np.prod(subpl), dtype=np.int32).reshape(subpl)
+    dest2 = np.empty(np.prod(fs), dtype=np.int32).reshape(fs)
 
     dest_b = ffi.from_buffer(dest)
+    dest2_b = ffi.from_buffer(dest2)
     comp_b = ffi.from_buffer(comp)
 
-    lib.decompress_trans(comp_b, dest_b, ts, ps,  dim, subpl, dimension, b_size, dest.dtype.itemsize)
+    lib.decompress_trans(comp_b, dest_b, dest2_b, s, ts, ps, subpl, fs, dim, dimension, b_size,
+                         dest.dtype.itemsize)
 
-    return dest
+    return dest2

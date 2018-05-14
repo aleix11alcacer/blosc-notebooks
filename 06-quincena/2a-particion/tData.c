@@ -493,6 +493,7 @@ static void (*_cffi_call_python_org)(struct _cffi_externpy_s *, char *);
 #include <stdio.h>
 #include <stdint.h>
 #include <blosc.h>
+#include <time.h>
 
 int calculate_j(int k, int dim[], int shp[], int sub[]) {
 
@@ -620,28 +621,32 @@ void tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
 
 }
 
-void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[], int dimensions[],
-                    int sub_trans[], int dimension, int b_size, int typesize){
+void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans_shape[], int part_shape[], int sub_trans[],
+                      int final_s[], int dimensions[], int dimension, int b_size, int typesize){
 
     int MAX_DIM = 8;
     int DIM = dimension;
 
-    int subpl[MAX_DIM], ts[MAX_DIM], ps[MAX_DIM], dim[MAX_DIM], sd[MAX_DIM];
+    int subpl[MAX_DIM], ts[MAX_DIM], ps[MAX_DIM], dim[MAX_DIM], sd[MAX_DIM], fs[MAX_DIM], s[MAX_DIM];
 
     for (int i = 0; i < MAX_DIM; i++) {
         if (i < DIM) {
+            s[MAX_DIM + i - DIM] = shape[i];
             ts[MAX_DIM + i - DIM] = trans_shape[i];
             ps[MAX_DIM + i - DIM] = part_shape[i];
             dim[MAX_DIM + i - DIM] = dimensions[i];
             subpl[MAX_DIM + i - DIM] = sub_trans[i];
+            fs[MAX_DIM + i - DIM] = final_s[i];
             sd[MAX_DIM + i - DIM] = trans_shape[i]/part_shape[i];
 
         } else {
+            s[MAX_DIM - i - 1] = 1;
             ts[MAX_DIM - i - 1] = 1;
             ps[MAX_DIM - i - 1] = 1;
             dim[MAX_DIM - i - 1] = -1;
             sd[MAX_DIM - i - 1] = 1;
             subpl[MAX_DIM - i - 1] = 1;
+            fs[MAX_DIM - i - 1] = 1;
 
         }
 
@@ -663,6 +668,7 @@ void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[]
     char *aux = malloc(b_size * typesize);
 
     int k, n;
+    // float time = 0;
 
     for (int a = oi_s[0]/ps[0]*ps[0]; a < oi_f[0]; a += ps[0]) {
         for (int b = oi_s[1]/ps[1]*ps[1]; b < oi_f[1]; b += ps[1]) {
@@ -672,6 +678,8 @@ void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[]
                         for (int f = oi_s[5]/ps[5]*ps[5]; f < oi_f[5]; f += ps[5]) {
                             for (int g = oi_s[6]/ps[6]*ps[6]; g < oi_f[6]; g += ps[6]) {
                                 for (int h = oi_s[7]/ps[7]*ps[7]; h < oi_f[7]; h += ps[7]) {
+
+                                    // int start = clock();
 
                                     k = h
                                          + g*ts[7]
@@ -690,6 +698,10 @@ void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[]
                                         + f/ps[5]*sd[6]*sd[7]
                                         + g/ps[6]*sd[7]
                                         + h/ps[7];
+
+                                    // int end = clock();
+
+                                    // time += end - start;
 
                                     blosc_getitem(comp, n * b_size, b_size, aux);
 
@@ -740,6 +752,60 @@ void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[]
        }
     }
 
+    // printf("El tiempo de calcular los índices es: %f", time/CLOCKS_PER_SEC);
+
+    int ini[MAX_DIM], fin[MAX_DIM];
+
+    for (int i = 0; i < MAX_DIM - 1; i += 1) {
+        if (dim[i] != -1) {
+            ini[i] = dim[i] % ps[MAX_DIM - 1];
+            fin[i] = dim[i] % ps[MAX_DIM - 1] + 1;
+        }
+        else {
+            ini[i] = 0;
+            fin[i] = s[i];
+        }
+    }
+
+    if (dim[MAX_DIM - 1] != -1) {
+        ini[MAX_DIM - 1] = dim[MAX_DIM - 1] % ps[MAX_DIM - 1];
+        fin[MAX_DIM - 1] = dim[MAX_DIM - 1] % ps[MAX_DIM - 1] + 1 ;
+    } else {
+        ini[MAX_DIM - 1] = 0;
+        fin[MAX_DIM - 1] = 1;
+    }
+
+    int cont = 0;
+
+    for (int a = ini[0]; a < fin[0]; a += 1) {
+        for (int b = ini[1]; b < fin[1]; b += 1) {
+            for (int c = ini[2]; c < fin[2]; c += 1) {
+                for (int d = ini[3]; d < fin[3]; d += 1) {
+                    for (int e = ini[4]; e < fin[4]; e += 1) {
+                        for (int f = ini[5]; f < fin[5]; f += 1) {
+                            for (int g = ini[6]; g < fin[6]; g += 1) {
+                                for (int h = ini[7]; h < fin[7]; h += 1) {
+                                    k = h
+                                         + g * subpl[7]
+                                         + f * subpl[7]*subpl[6]
+                                         + e * subpl[7]*subpl[6]*subpl[5]
+                                         + d * subpl[7]*subpl[6]*subpl[5]*subpl[4]
+                                         + c * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]
+                                         + b * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]
+                                         + a * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1];
+
+                                    memcpy(&dest2[cont * typesize], &dest[k * typesize], fs[7] * typesize);
+
+                                    cont += fs[7];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 
@@ -753,47 +819,50 @@ static void *_cffi_types[] = {
 /*  3 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /*  4 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /*  5 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION, 46), // void()(char *, char *, int *, int *, int *, int *, int, int, int)
-/*  7 */ _CFFI_OP(_CFFI_OP_POINTER, 45), // char *
+/*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION, 49), // void()(char *, char *, char *, int *, int *, int *, int *, int *, int *, int, int, int)
+/*  7 */ _CFFI_OP(_CFFI_OP_POINTER, 48), // char *
 /*  8 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/*  9 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/*  9 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 10 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /* 11 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
 /* 12 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 13 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 14 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 15 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 16 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 17 */ _CFFI_OP(_CFFI_OP_FUNCTION, 46), // void()(char *, char *, int, int *, int *, int *, int, int, int)
-/* 18 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 19 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 20 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 21 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 22 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 23 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 24 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 25 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 26 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 27 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 28 */ _CFFI_OP(_CFFI_OP_FUNCTION, 46), // void()(char *, char *, int, int *, int *, int)
-/* 29 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 30 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 31 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 32 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 33 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 13 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 14 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 15 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 16 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 17 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 18 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 19 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 20 */ _CFFI_OP(_CFFI_OP_FUNCTION, 49), // void()(char *, char *, int, int *, int *, int *, int, int, int)
+/* 21 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 22 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 23 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 24 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 25 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 26 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 27 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 28 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 29 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 30 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 31 */ _CFFI_OP(_CFFI_OP_FUNCTION, 49), // void()(char *, char *, int, int *, int *, int)
+/* 32 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 33 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 34 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 35 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 36 */ _CFFI_OP(_CFFI_OP_FUNCTION, 46), // void()(char *, char *, int, int *, int *, int, int)
-/* 37 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 38 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
-/* 39 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 40 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
-/* 41 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 35 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 36 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 37 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 38 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 39 */ _CFFI_OP(_CFFI_OP_FUNCTION, 49), // void()(char *, char *, int, int *, int *, int, int)
+/* 40 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
+/* 41 */ _CFFI_OP(_CFFI_OP_NOOP, 7),
 /* 42 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 43 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 44 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 45 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
-/* 46 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
+/* 43 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 44 */ _CFFI_OP(_CFFI_OP_NOOP, 2),
+/* 45 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 46 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 47 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 48 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
+/* 49 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
 };
 
 static int _cffi_d_calculate_j(int x0, int * x1, int * x2, int * x3)
@@ -868,9 +937,9 @@ _cffi_f_calculate_j(PyObject *self, PyObject *args)
 #  define _cffi_f_calculate_j _cffi_d_calculate_j
 #endif
 
-static void _cffi_d_decompress_trans(char * x0, char * x1, int * x2, int * x3, int * x4, int * x5, int x6, int x7, int x8)
+static void _cffi_d_decompress_trans(char * x0, char * x1, char * x2, int * x3, int * x4, int * x5, int * x6, int * x7, int * x8, int x9, int x10, int x11)
 {
-  decompress_trans(x0, x1, x2, x3, x4, x5, x6, x7, x8);
+  decompress_trans(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11);
 }
 #ifndef PYPY_VERSION
 static PyObject *
@@ -878,13 +947,16 @@ _cffi_f_decompress_trans(PyObject *self, PyObject *args)
 {
   char * x0;
   char * x1;
-  int * x2;
+  char * x2;
   int * x3;
   int * x4;
   int * x5;
-  int x6;
-  int x7;
-  int x8;
+  int * x6;
+  int * x7;
+  int * x8;
+  int x9;
+  int x10;
+  int x11;
   Py_ssize_t datasize;
   PyObject *arg0;
   PyObject *arg1;
@@ -895,8 +967,11 @@ _cffi_f_decompress_trans(PyObject *self, PyObject *args)
   PyObject *arg6;
   PyObject *arg7;
   PyObject *arg8;
+  PyObject *arg9;
+  PyObject *arg10;
+  PyObject *arg11;
 
-  if (!PyArg_UnpackTuple(args, "decompress_trans", 9, 9, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8))
+  if (!PyArg_UnpackTuple(args, "decompress_trans", 12, 12, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8, &arg9, &arg10, &arg11))
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
@@ -922,13 +997,13 @@ _cffi_f_decompress_trans(PyObject *self, PyObject *args)
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(2), arg2, (char **)&x2);
+      _cffi_type(7), arg2, (char **)&x2);
   if (datasize != 0) {
     if (datasize < 0)
       return NULL;
-    x2 = (int *)alloca((size_t)datasize);
+    x2 = (char *)alloca((size_t)datasize);
     memset((void *)x2, 0, (size_t)datasize);
-    if (_cffi_convert_array_from_object((char *)x2, _cffi_type(2), arg2) < 0)
+    if (_cffi_convert_array_from_object((char *)x2, _cffi_type(7), arg2) < 0)
       return NULL;
   }
 
@@ -965,21 +1040,54 @@ _cffi_f_decompress_trans(PyObject *self, PyObject *args)
       return NULL;
   }
 
-  x6 = _cffi_to_c_int(arg6, int);
-  if (x6 == (int)-1 && PyErr_Occurred())
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(2), arg6, (char **)&x6);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x6 = (int *)alloca((size_t)datasize);
+    memset((void *)x6, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x6, _cffi_type(2), arg6) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(2), arg7, (char **)&x7);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x7 = (int *)alloca((size_t)datasize);
+    memset((void *)x7, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x7, _cffi_type(2), arg7) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(2), arg8, (char **)&x8);
+  if (datasize != 0) {
+    if (datasize < 0)
+      return NULL;
+    x8 = (int *)alloca((size_t)datasize);
+    memset((void *)x8, 0, (size_t)datasize);
+    if (_cffi_convert_array_from_object((char *)x8, _cffi_type(2), arg8) < 0)
+      return NULL;
+  }
+
+  x9 = _cffi_to_c_int(arg9, int);
+  if (x9 == (int)-1 && PyErr_Occurred())
     return NULL;
 
-  x7 = _cffi_to_c_int(arg7, int);
-  if (x7 == (int)-1 && PyErr_Occurred())
+  x10 = _cffi_to_c_int(arg10, int);
+  if (x10 == (int)-1 && PyErr_Occurred())
     return NULL;
 
-  x8 = _cffi_to_c_int(arg8, int);
-  if (x8 == (int)-1 && PyErr_Occurred())
+  x11 = _cffi_to_c_int(arg11, int);
+  if (x11 == (int)-1 && PyErr_Occurred())
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
   _cffi_restore_errno();
-  { decompress_trans(x0, x1, x2, x3, x4, x5, x6, x7, x8); }
+  { decompress_trans(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11); }
   _cffi_save_errno();
   Py_END_ALLOW_THREADS
 
@@ -1298,9 +1406,9 @@ _cffi_f_tData_simple(PyObject *self, PyObject *args)
 static const struct _cffi_global_s _cffi_globals[] = {
   { "calculate_j", (void *)_cffi_f_calculate_j, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 0), (void *)_cffi_d_calculate_j },
   { "decompress_trans", (void *)_cffi_f_decompress_trans, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 6), (void *)_cffi_d_decompress_trans },
-  { "padData", (void *)_cffi_f_padData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 28), (void *)_cffi_d_padData },
-  { "tData", (void *)_cffi_f_tData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 17), (void *)_cffi_d_tData },
-  { "tData_simple", (void *)_cffi_f_tData_simple, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 36), (void *)_cffi_d_tData_simple },
+  { "padData", (void *)_cffi_f_padData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 31), (void *)_cffi_d_padData },
+  { "tData", (void *)_cffi_f_tData, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 20), (void *)_cffi_d_tData },
+  { "tData_simple", (void *)_cffi_f_tData_simple, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 39), (void *)_cffi_d_tData_simple },
 };
 
 static const struct _cffi_type_context_s _cffi_type_context = {
@@ -1315,7 +1423,7 @@ static const struct _cffi_type_context_s _cffi_type_context = {
   0,  /* num_enums */
   0,  /* num_typenames */
   NULL,  /* no includes */
-  47,  /* num_types */
+  50,  /* num_types */
   0,  /* flags */
 };
 

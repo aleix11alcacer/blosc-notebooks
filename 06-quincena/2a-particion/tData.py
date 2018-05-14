@@ -119,6 +119,7 @@ ffibuilder.set_source("tData",
 #include <stdio.h>
 #include <stdint.h>
 #include <blosc.h>
+#include <time.h>
 
 int calculate_j(int k, int dim[], int shp[], int sub[]) {
 
@@ -246,28 +247,32 @@ void tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
 
 }
 
-void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[], int dimensions[],
-                    int sub_trans[], int dimension, int b_size, int typesize){
+void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans_shape[], int part_shape[], int sub_trans[],
+                      int final_s[], int dimensions[], int dimension, int b_size, int typesize){
 
     int MAX_DIM = 8;
     int DIM = dimension;
 
-    int subpl[MAX_DIM], ts[MAX_DIM], ps[MAX_DIM], dim[MAX_DIM], sd[MAX_DIM];
+    int subpl[MAX_DIM], ts[MAX_DIM], ps[MAX_DIM], dim[MAX_DIM], sd[MAX_DIM], fs[MAX_DIM], s[MAX_DIM];
 
     for (int i = 0; i < MAX_DIM; i++) {
         if (i < DIM) {
+            s[MAX_DIM + i - DIM] = shape[i];
             ts[MAX_DIM + i - DIM] = trans_shape[i];
             ps[MAX_DIM + i - DIM] = part_shape[i];
             dim[MAX_DIM + i - DIM] = dimensions[i];
             subpl[MAX_DIM + i - DIM] = sub_trans[i];
+            fs[MAX_DIM + i - DIM] = final_s[i];
             sd[MAX_DIM + i - DIM] = trans_shape[i]/part_shape[i];
 
         } else {
+            s[MAX_DIM - i - 1] = 1;
             ts[MAX_DIM - i - 1] = 1;
             ps[MAX_DIM - i - 1] = 1;
             dim[MAX_DIM - i - 1] = -1;
             sd[MAX_DIM - i - 1] = 1;
             subpl[MAX_DIM - i - 1] = 1;
+            fs[MAX_DIM - i - 1] = 1;
 
         }
 
@@ -289,6 +294,7 @@ void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[]
     char *aux = malloc(b_size * typesize);
 
     int k, n;
+    // float time = 0;
 
     for (int a = oi_s[0]/ps[0]*ps[0]; a < oi_f[0]; a += ps[0]) {
         for (int b = oi_s[1]/ps[1]*ps[1]; b < oi_f[1]; b += ps[1]) {
@@ -298,6 +304,8 @@ void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[]
                         for (int f = oi_s[5]/ps[5]*ps[5]; f < oi_f[5]; f += ps[5]) {
                             for (int g = oi_s[6]/ps[6]*ps[6]; g < oi_f[6]; g += ps[6]) {
                                 for (int h = oi_s[7]/ps[7]*ps[7]; h < oi_f[7]; h += ps[7]) {
+
+                                    // int start = clock();
 
                                     k = h
                                          + g*ts[7]
@@ -316,6 +324,10 @@ void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[]
                                         + f/ps[5]*sd[6]*sd[7]
                                         + g/ps[6]*sd[7]
                                         + h/ps[7];
+
+                                    // int end = clock();
+
+                                    // time += end - start;
 
                                     blosc_getitem(comp, n * b_size, b_size, aux);
 
@@ -366,6 +378,60 @@ void decompress_trans(char* comp,char* dest, int trans_shape[], int part_shape[]
        }
     }
 
+    // printf("El tiempo de calcular los índices es: %f", time/CLOCKS_PER_SEC);
+
+    int ini[MAX_DIM], fin[MAX_DIM];
+
+    for (int i = 0; i < MAX_DIM - 1; i += 1) {
+        if (dim[i] != -1) {
+            ini[i] = dim[i] % ps[MAX_DIM - 1];
+            fin[i] = dim[i] % ps[MAX_DIM - 1] + 1;
+        }
+        else {
+            ini[i] = 0;
+            fin[i] = s[i];
+        }
+    }
+
+    if (dim[MAX_DIM - 1] != -1) {
+        ini[MAX_DIM - 1] = dim[MAX_DIM - 1] % ps[MAX_DIM - 1];
+        fin[MAX_DIM - 1] = dim[MAX_DIM - 1] % ps[MAX_DIM - 1] + 1 ;
+    } else {
+        ini[MAX_DIM - 1] = 0;
+        fin[MAX_DIM - 1] = 1;
+    }
+
+    int cont = 0;
+
+    for (int a = ini[0]; a < fin[0]; a += 1) {
+        for (int b = ini[1]; b < fin[1]; b += 1) {
+            for (int c = ini[2]; c < fin[2]; c += 1) {
+                for (int d = ini[3]; d < fin[3]; d += 1) {
+                    for (int e = ini[4]; e < fin[4]; e += 1) {
+                        for (int f = ini[5]; f < fin[5]; f += 1) {
+                            for (int g = ini[6]; g < fin[6]; g += 1) {
+                                for (int h = ini[7]; h < fin[7]; h += 1) {
+                                    k = h
+                                         + g * subpl[7]
+                                         + f * subpl[7]*subpl[6]
+                                         + e * subpl[7]*subpl[6]*subpl[5]
+                                         + d * subpl[7]*subpl[6]*subpl[5]*subpl[4]
+                                         + c * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]
+                                         + b * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]
+                                         + a * subpl[7]*subpl[6]*subpl[5]*subpl[4]*subpl[3]*subpl[2]*subpl[1];
+
+                                    memcpy(&dest2[cont * typesize], &dest[k * typesize], fs[7] * typesize);
+
+                                    cont += fs[7];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 ''', libraries=['blosc'])
@@ -385,9 +451,9 @@ ffibuilder.cdef(
 
                 int calculate_j(int k, int dim[], int shp[], int sub[]);
 
-                void decompress_trans(char* comp, char* dest, int trans_shape[], int part_shape[],
-                                    int sub_trans[], int dimensions[], int dimension, int b_size,
-                                    int typesize);
+                void decompress_trans(char* comp, char* dest, char* dest2, int shape[], int trans_shape[], int part_shape[],
+                                    int sub_trans[], int final_s[], int dimensions[], int dimension,
+                                    int b_size, int typesize);
 
                 '''
                 )
