@@ -91,7 +91,7 @@ def compress(src, ps):
 
     cb2.blosc_set_blocksize(np.prod(ps) * itemsize)
 
-    size_c = cb2.blosc_compress(9, 1, itemsize, bsize, src, dest, bsize)
+    cb2.blosc_compress(9, 1, itemsize, bsize, src, dest, bsize)
 
     return dest
 
@@ -122,7 +122,7 @@ def decompress(comp, s, itemsize, dtype):
 
     dest = np.empty(size, dtype=dtype).reshape(s)
 
-    size_d = cb2.blosc_decompress(comp, dest, bsize)
+    cb2.blosc_decompress(comp, dest, bsize)
 
     return dest
 
@@ -135,6 +135,8 @@ def decompress_trans(comp, s, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, 
     ----------
     comp : chunk
         Data compressed.
+    s: int[] or tuple
+        Original data shape.
     ts: int[] or tuple
         Partitioned data shape.
     ps: int[] or tuple

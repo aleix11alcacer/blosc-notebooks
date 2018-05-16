@@ -758,8 +758,8 @@ void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans
 
     for (int i = 0; i < MAX_DIM - 1; i += 1) {
         if (dim[i] != -1) {
-            ini[i] = dim[i] % ps[MAX_DIM - 1];
-            fin[i] = dim[i] % ps[MAX_DIM - 1] + 1;
+            ini[i] = dim[i] % ps[i];
+            fin[i] = dim[i] % ps[i] + 1;
         }
         else {
             ini[i] = 0;
