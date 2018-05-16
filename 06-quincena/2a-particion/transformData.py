@@ -156,25 +156,20 @@ def decompress_trans(comp, s, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, 
 
     # Calculate desired data shape
 
-    subpl = [1] * dimension
     fs = [1] * dimension
 
     for i in range(dimension):
         if dim[i] != -1:
-            subpl[i] = ps[i]
             fs[i] = 1
         else:
-            subpl[i] = ts[i]
             fs[i] = s[i]
 
-    dest = np.empty(np.prod(subpl), dtype=np.int32).reshape(subpl)
-    dest2 = np.empty(np.prod(fs), dtype=np.int32).reshape(fs)
+    dest = np.empty(np.prod(fs), dtype=np.int32).reshape(fs)
 
     dest_b = ffi.from_buffer(dest)
-    dest2_b = ffi.from_buffer(dest2)
     comp_b = ffi.from_buffer(comp)
 
-    lib.decompress_trans(comp_b, dest_b, dest2_b, s, ts, ps, subpl, fs, dim, dimension, b_size,
+    lib.decompress_trans(comp_b, dest_b, s, ts, ps, fs, dim, dimension, b_size,
                          dest.dtype.itemsize)
 
-    return dest2
+    return dest

@@ -247,11 +247,13 @@ void tData(char* src, char* dest, int typesize, int shape[], int pad_shape[],
 
 }
 
-void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans_shape[], int part_shape[], int sub_trans[],
+void decompress_trans(char* comp, char* dest2, int shape[], int trans_shape[], int part_shape[],
                       int final_s[], int dimensions[], int dimension, int b_size, int typesize){
 
     int MAX_DIM = 8;
     int DIM = dimension;
+
+    // Calculate dimensions data
 
     int subpl[MAX_DIM], ts[MAX_DIM], ps[MAX_DIM], dim[MAX_DIM], sd[MAX_DIM], fs[MAX_DIM], s[MAX_DIM];
 
@@ -261,7 +263,6 @@ void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans
             ts[MAX_DIM + i - DIM] = trans_shape[i];
             ps[MAX_DIM + i - DIM] = part_shape[i];
             dim[MAX_DIM + i - DIM] = dimensions[i];
-            subpl[MAX_DIM + i - DIM] = sub_trans[i];
             fs[MAX_DIM + i - DIM] = final_s[i];
             sd[MAX_DIM + i - DIM] = trans_shape[i]/part_shape[i];
 
@@ -271,7 +272,6 @@ void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans
             ps[MAX_DIM - i - 1] = 1;
             dim[MAX_DIM - i - 1] = -1;
             sd[MAX_DIM - i - 1] = 1;
-            subpl[MAX_DIM - i - 1] = 1;
             fs[MAX_DIM - i - 1] = 1;
 
         }
@@ -283,18 +283,32 @@ void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans
 
     for (int i = 0; i < MAX_DIM; i++) {
         if (dim[i] != -1) {
+            subpl[i] = ps[i];
             oi_s[i] = dim[i];
             oi_f[i] = dim[i] + 1;
         } else {
+            subpl[i] = ts[i];
             oi_s[i] = 0;
             oi_f[i] = ts[i];
         }
     }
 
+    int subpl_size = 1;
+
+    for (int i = 0; i < MAX_DIM; i++) {
+        subpl_size *= subpl[i];
+    }
+
+    // Malloc buffers
+
     char *aux = malloc(b_size * typesize);
+    char *dest = malloc(subpl_size * typesize);
+
+    // Calculate index to decompress
 
     int k, n;
-    // float time = 0;
+    int h2, g2, f2, e2, d2, c2, b2, a2;
+    int cont;
 
     for (int a = oi_s[0]/ps[0]*ps[0]; a < oi_f[0]; a += ps[0]) {
         for (int b = oi_s[1]/ps[1]*ps[1]; b < oi_f[1]; b += ps[1]) {
@@ -304,8 +318,6 @@ void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans
                         for (int f = oi_s[5]/ps[5]*ps[5]; f < oi_f[5]; f += ps[5]) {
                             for (int g = oi_s[6]/ps[6]*ps[6]; g < oi_f[6]; g += ps[6]) {
                                 for (int h = oi_s[7]/ps[7]*ps[7]; h < oi_f[7]; h += ps[7]) {
-
-                                    // int start = clock();
 
                                     k = h
                                          + g*ts[7]
@@ -325,22 +337,21 @@ void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans
                                         + g/ps[6]*sd[7]
                                         + h/ps[7];
 
-                                    // int end = clock();
-
-                                    // time += end - start;
 
                                     blosc_getitem(comp, n * b_size, b_size, aux);
 
-                                    int h2 = k % ts[7] % subpl[7];
-                                    int g2 = k / (ts[7]) % subpl[6];
-                                    int f2 = k / (ts[7]*ts[6]) % subpl[5];
-                                    int e2 = k / (ts[7]*ts[6]*ts[5]) % subpl[4];
-                                    int d2 = k / (ts[7]*ts[6]*ts[5]*ts[4]) % subpl[3];
-                                    int c2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]) % subpl[2];
-                                    int b2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]) % subpl[1];
-                                    int a2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]*ts[1]) % subpl[0];
+                                    h2 = k % ts[7] % subpl[7];
+                                    g2 = k / (ts[7]) % subpl[6];
+                                    f2 = k / (ts[7]*ts[6]) % subpl[5];
+                                    e2 = k / (ts[7]*ts[6]*ts[5]) % subpl[4];
+                                    d2 = k / (ts[7]*ts[6]*ts[5]*ts[4]) % subpl[3];
+                                    c2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]) % subpl[2];
+                                    b2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]) % subpl[1];
+                                    a2 = k / (ts[7]*ts[6]*ts[5]*ts[4]*ts[3]*ts[2]*ts[1]) % subpl[0];
 
-                                    int cont = 0;
+                                    // Copy block to final data
+
+                                    cont = 0;
 
                                     for (int ra = a2; ra < a2 + ps[0]; ra++) {
                                         for (int rb = b2; rb < b2 + ps[1]; rb++) {
@@ -376,9 +387,11 @@ void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans
                 }
             }
        }
+       free(dest);
+       free(aux);
     }
 
-    // printf("El tiempo de calcular los índices es: %f", time/CLOCKS_PER_SEC);
+    // Reduce final data
 
     int ini[MAX_DIM], fin[MAX_DIM];
 
@@ -401,7 +414,7 @@ void decompress_trans(char* comp,char* dest, char* dest2, int shape[], int trans
         fin[MAX_DIM - 1] = 1;
     }
 
-    int cont = 0;
+    cont = 0;
 
     for (int a = ini[0]; a < fin[0]; a += 1) {
         for (int b = ini[1]; b < fin[1]; b += 1) {
@@ -451,9 +464,9 @@ ffibuilder.cdef(
 
                 int calculate_j(int k, int dim[], int shp[], int sub[]);
 
-                void decompress_trans(char* comp, char* dest, char* dest2, int shape[], int trans_shape[], int part_shape[],
-                                    int sub_trans[], int final_s[], int dimensions[], int dimension,
-                                    int b_size, int typesize);
+                void decompress_trans(char* comp, char* dest2, int shape[], int trans_shape[],
+                                      int part_shape[], int final_s[], int dimensions[],
+                                      int dimension, int b_size, int typesize);
 
                 '''
                 )
