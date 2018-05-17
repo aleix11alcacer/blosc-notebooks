@@ -96,7 +96,7 @@ def compress(src, ps):
     return dest
 
 
-def decompress(comp, s, itemsize, dtype):
+def decompress(comp, s, dtype):
     """
     Decompress data.
 
@@ -118,7 +118,7 @@ def decompress(comp, s, itemsize, dtype):
     """
 
     size = np.prod(s)
-    bsize = size * itemsize
+    bsize = size * dtype.itemsize
 
     dest = np.empty(size, dtype=dtype).reshape(s)
 
@@ -127,7 +127,7 @@ def decompress(comp, s, itemsize, dtype):
     return dest
 
 
-def decompress_trans(comp, s, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, h=-1):
+def decompress_trans(comp, s, ts, ps, dtype, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, h=-1):
     """
     Decompress partitioned data.
 
@@ -164,7 +164,7 @@ def decompress_trans(comp, s, ts, ps, a=-1, b=-1, c=-1, d=-1, e=-1, f=-1, g=-1, 
         else:
             fs[i] = s[i]
 
-    dest = np.empty(np.prod(fs), dtype=np.int32).reshape(fs)
+    dest = np.empty(np.prod(fs), dtype=dtype).reshape(fs)
 
     dest_b = ffi.from_buffer(dest)
     comp_b = ffi.from_buffer(comp)

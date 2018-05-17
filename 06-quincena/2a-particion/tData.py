@@ -387,8 +387,8 @@ void decompress_trans(char* comp, char* dest2, int shape[], int trans_shape[], i
                 }
             }
        }
-       free(dest);
-       free(aux);
+
+   
     }
 
     // Reduce final data
@@ -444,7 +444,8 @@ void decompress_trans(char* comp, char* dest2, int shape[], int trans_shape[], i
             }
         }
     }
-
+    free(aux);
+    free(dest);
 }
 
 ''', libraries=['blosc'])
