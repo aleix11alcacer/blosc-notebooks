@@ -332,7 +332,7 @@ transformación}\label{datos-sin-transformaciuxf3n}
     \subsubsection{Datos transformados}\label{datos-transformados}
 
     El tamaño de las particiones tiene que ser más pequeño que el del
-conjunto de datos. En este caso, las particiones son de \(32\) o \(16\)
+conjunto de datos. En este caso, las particiones son de \(32\) o \(8\)
 elementos por cada dimensión lo que resulta que cada partición tendrá
 \(32\cdot8\cdot8\cdot32=65.536\) elementos.
 
@@ -376,7 +376,7 @@ datos}\label{compresiuxf3n-y-descompresiuxf3n-de-los-datos}
         
         \PY{n}{start} \PY{o}{=} \PY{n}{t}\PY{o}{.}\PY{n}{perf\PYZus{}counter}\PY{p}{(}\PY{p}{)}
         \PY{n}{res\PYZus{}trans} \PY{o}{=} \PY{n}{td}\PY{o}{.}\PY{n}{decompress\PYZus{}trans}\PY{p}{(}\PY{n}{dest\PYZus{}trans}\PY{p}{,} \PY{n}{SHAPE}\PY{p}{,} \PY{n}{TSHAPE}\PY{p}{,} 
-                                        \PY{n}{PART\PYZus{}SHAPE}\PY{p}{,} \PY{n}{b}\PY{o}{=}\PY{l+m+mi}{35}\PY{p}{,} \PY{n}{c}\PY{o}{=}\PY{l+m+mi}{23}\PY{p}{)}
+                                        \PY{n}{PART\PYZus{}SHAPE}\PY{p}{,} \PY{n}{DTYPE}\PY{p}{,} \PY{n}{b}\PY{o}{=}\PY{l+m+mi}{35}\PY{p}{,} \PY{n}{c}\PY{o}{=}\PY{l+m+mi}{23}\PY{p}{)}
         \PY{n}{end} \PY{o}{=} \PY{n}{t}\PY{o}{.}\PY{n}{perf\PYZus{}counter}\PY{p}{(}\PY{p}{)}
         
         \PY{n}{dt\PYZus{}t} \PY{o}{=} \PY{n}{end} \PY{o}{\PYZhy{}} \PY{n}{start}
@@ -384,7 +384,7 @@ datos}\label{compresiuxf3n-y-descompresiuxf3n-de-los-datos}
         \PY{c+c1}{\PYZsh{} Datos originales}
         
         \PY{n}{start} \PY{o}{=} \PY{n}{t}\PY{o}{.}\PY{n}{perf\PYZus{}counter}\PY{p}{(}\PY{p}{)}
-        \PY{n}{res} \PY{o}{=} \PY{n}{td}\PY{o}{.}\PY{n}{decompress}\PY{p}{(}\PY{n}{dest}\PY{p}{,} \PY{n}{SHAPE}\PY{p}{,} \PY{n}{ITEMSIZE}\PY{p}{,} \PY{n}{DTYPE}\PY{p}{)}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{l+m+mi}{35}\PY{p}{,} \PY{l+m+mi}{23}\PY{p}{,} \PY{p}{:}\PY{p}{]}\PYZbs{}
+        \PY{n}{res} \PY{o}{=} \PY{n}{td}\PY{o}{.}\PY{n}{decompress}\PY{p}{(}\PY{n}{dest}\PY{p}{,} \PY{n}{SHAPE}\PY{p}{,} \PY{n}{DTYPE}\PY{p}{)}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{l+m+mi}{35}\PY{p}{,} \PY{l+m+mi}{23}\PY{p}{,} \PY{p}{:}\PY{p}{]}\PYZbs{}
                 \PY{o}{.}\PY{n}{reshape}\PY{p}{(}\PY{n}{res\PYZus{}trans}\PY{o}{.}\PY{n}{shape}\PY{p}{)}
         \PY{n}{end} \PY{o}{=} \PY{n}{t}\PY{o}{.}\PY{n}{perf\PYZus{}counter}\PY{p}{(}\PY{p}{)}
         
@@ -409,7 +409,7 @@ datos}\label{compresiuxf3n-y-descompresiuxf3n-de-los-datos}
 
     \begin{Verbatim}[commandchars=\\\{\}]
 OK. Las dos matrices son iguales.
-El tiempo de decompresión de los datos particionados es 135.3578 veces más rápido que el de la decompresión normal.
+El tiempo de decompresión de los datos particionados es 126.6051 veces más rápido que el de la decompresión normal.
 
     \end{Verbatim}
 
